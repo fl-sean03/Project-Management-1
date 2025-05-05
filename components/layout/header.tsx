@@ -1,0 +1,145 @@
+"use client"
+
+import Link from "next/link"
+import { useState } from "react"
+import { Bell, Search, Menu, ChevronLeft } from "lucide-react"
+import { Button } from "@/components/ui/button"
+import { Input } from "@/components/ui/input"
+import { Sheet, SheetContent, SheetTrigger } from "@/components/ui/sheet"
+import { Sidebar } from "@/components/layout/sidebar"
+import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
+import { currentUser } from "@/mock/users"
+import { notifications } from "@/mock/notifications"
+import { Logo } from "@/components/ui/logo"
+import { useRouter, usePathname } from "next/navigation"
+import { useAuth } from "@/lib/auth-context"
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuLabel,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu"
+
+interface HeaderProps {
+  title?: string
+  showLogo?: boolean
+}
+
+export function Header({ title, showLogo = false }: HeaderProps) {
+  const [searchQuery, setSearchQuery] = useState("")
+  const router = useRouter()
+  const pathname = usePathname()
+  const { signOut, user } = useAuth()
+
+  const isProjectPage = pathname.includes("/project/")
+  const projectId = isProjectPage ? pathname.split("/")[2] : null
+
+  const handleBackToProjects = () => {
+    router.push("/projects")
+  }
+
+  const handleSignOut = async () => {
+    try {
+      await signOut()
+      // The auth context will handle the redirect
+    } catch (error) {
+      console.error("Error signing out:", error)
+    }
+  }
+
+  return (
+    <header className="sticky top-0 z-10 flex h-16 items-center justify-between border-b bg-white px-4 lg:px-6">
+      <div className="flex items-center gap-4">
+        {isProjectPage ? (
+          <Button variant="ghost" size="icon" onClick={handleBackToProjects} className="mr-2">
+            <ChevronLeft className="h-5 w-5" />
+            <span className="sr-only">Back to projects</span>
+          </Button>
+        ) : null}
+
+        {isProjectPage && (
+          <Sheet>
+            <SheetTrigger asChild>
+              <Button variant="ghost" size="icon" className="lg:hidden">
+                <Menu className="h-5 w-5" />
+                <span className="sr-only">Toggle navigation menu</span>
+              </Button>
+            </SheetTrigger>
+            <SheetContent side="left" className="p-0">
+              <Sidebar projectId={projectId} />
+            </SheetContent>
+          </Sheet>
+        )}
+
+        {showLogo && <Logo withText />}
+
+        {title && <h1 className="text-xl font-bold tracking-tight">{title}</h1>}
+      </div>
+
+      <div className="flex flex-1 items-center justify-end gap-4">
+        <div className="relative hidden w-full max-w-sm lg:block">
+          <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
+          <Input
+            type="search"
+            placeholder="Search..."
+            className="w-full bg-muted pl-8"
+            value={searchQuery}
+            onChange={(e) => setSearchQuery(e.target.value)}
+          />
+        </div>
+
+        <DropdownMenu>
+          <DropdownMenuTrigger asChild>
+            <Button variant="ghost" size="icon" className="relative">
+              <Bell className="h-5 w-5" />
+              {notifications.filter((n) => !n.read).length > 0 && (
+                <span className="absolute right-1 top-1 flex h-2 w-2 rounded-full bg-destructive-red"></span>
+              )}
+              <span className="sr-only">Notifications</span>
+            </Button>
+          </DropdownMenuTrigger>
+          <DropdownMenuContent align="end" className="w-80">
+            <DropdownMenuLabel>Notifications</DropdownMenuLabel>
+            <DropdownMenuSeparator />
+            {notifications.slice(0, 5).map((notification) => (
+              <DropdownMenuItem key={notification.id} className="flex flex-col items-start py-2">
+                <div className="text-sm font-medium">{notification.content}</div>
+                <div className="text-xs text-muted-foreground">{notification.time}</div>
+              </DropdownMenuItem>
+            ))}
+            <DropdownMenuSeparator />
+            <DropdownMenuItem className="justify-center text-sm font-medium">View all notifications</DropdownMenuItem>
+          </DropdownMenuContent>
+        </DropdownMenu>
+
+        <DropdownMenu>
+          <DropdownMenuTrigger asChild>
+            <Button variant="ghost" size="icon" className="relative h-8 w-8 rounded-full">
+              <Avatar className="h-8 w-8">
+                <AvatarImage src={(user?.user_metadata?.avatar || currentUser.avatar || "/placeholder.svg")} alt={user?.user_metadata?.name || currentUser.name} />
+                <AvatarFallback>
+                  {(user?.user_metadata?.name || currentUser.name)
+                    .split(" ")
+                    .map((n: string) => n[0])
+                    .join("")}
+                </AvatarFallback>
+              </Avatar>
+            </Button>
+          </DropdownMenuTrigger>
+          <DropdownMenuContent align="end">
+            <DropdownMenuLabel>My Account</DropdownMenuLabel>
+            <DropdownMenuSeparator />
+            <DropdownMenuItem>Profile</DropdownMenuItem>
+            <DropdownMenuItem>Settings</DropdownMenuItem>
+            <DropdownMenuSeparator />
+            <DropdownMenuItem onClick={handleSignOut}>
+              Log out
+            </DropdownMenuItem>
+          </DropdownMenuContent>
+        </DropdownMenu>
+      </div>
+    </header>
+  )
+}
