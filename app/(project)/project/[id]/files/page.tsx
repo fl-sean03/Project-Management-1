@@ -1,12 +1,8 @@
 "use client"
 
-import { useState } from "react"
+import { useState, useEffect } from "react"
 import { notFound } from "next/navigation"
-import { use } from "react"
 import { Header } from "@/components/layout/header"
-import { files } from "@/mock/files"
-import { users } from "@/mock/users"
-import { projects } from "@/mock/projects"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
@@ -25,30 +21,75 @@ import {
   MoreHorizontal,
 } from "lucide-react"
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu"
+import { projectService, userService, Project, User, File as FileType } from "@/lib/supabase-service"
 
 interface ProjectFilesPageProps {
-  params: Promise<{
+  params: {
     id: string
-  }>
+  }
 }
 
 export default function ProjectFilesPage({ params }: ProjectFilesPageProps) {
-  const { id } = use(params)
-  const project = projects.find((p) => p.id === id)
-
-  if (!project) {
-    notFound()
-  }
+  const id = params.id
+  
+  const [project, setProject] = useState<Project | null>(null)
+  const [files, setFiles] = useState<FileType[]>([])
+  const [users, setUsers] = useState<User[]>([])
+  const [loading, setLoading] = useState(true)
+  const [error, setError] = useState<string | null>(null)
 
   const [searchQuery, setSearchQuery] = useState("")
   const [typeFilter, setTypeFilter] = useState("all")
   const [view, setView] = useState("grid")
 
-  // Filter files for this project
-  const projectFiles = files.filter((file) => file.project === project.id)
+  // Fetch project, files, and users data
+  useEffect(() => {
+    const fetchData = async () => {
+      setLoading(true)
+      try {
+        // Fetch project
+        const { data: projectData, error: projectError } = await projectService.getProjectById(id)
+        if (projectError || !projectData) {
+          console.error("Error fetching project:", projectError)
+          throw new Error(projectError?.message || "Failed to fetch project")
+        }
+        setProject(projectData)
+        
+        // For files, we would need a service method to fetch files by project
+        // This is a placeholder - you would need to implement this in your service
+        // const { data: filesData, error: filesError } = await fileService.getFilesByProject(id)
+        // For now, we'll use an empty array
+        setFiles([])
+        
+        // Fetch users
+        const { data: usersData, error: usersError } = await userService.getAllUsers()
+        if (usersError) {
+          console.error("Error fetching users:", usersError)
+          throw new Error(usersError.message)
+        }
+        setUsers(usersData || [])
+        
+      } catch (err: any) {
+        setError(err.message || "An error occurred")
+      } finally {
+        setLoading(false)
+      }
+    }
+    
+    fetchData()
+  }, [id])
+
+  // If loading or error, show appropriate UI
+  if (loading) {
+    return <div className="p-4">Loading files data...</div>
+  }
+  
+  if (error || !project) {
+    return notFound()
+  }
 
   // Filter files based on search query and type
-  const filteredFiles = projectFiles.filter((file) => {
+  const filteredFiles = files.filter((file) => {
     const matchesSearch = file.name.toLowerCase().includes(searchQuery.toLowerCase())
     const matchesType = typeFilter === "all" || file.type === typeFilter
 
@@ -60,6 +101,7 @@ export default function ProjectFilesPage({ params }: ProjectFilesPageProps) {
   }
 
   const formatDate = (dateString: string) => {
+    if (!dateString) return "Unknown date";
     const date = new Date(dateString)
     return new Intl.DateTimeFormat("en-US", {
       month: "short",
@@ -77,8 +119,13 @@ export default function ProjectFilesPage({ params }: ProjectFilesPageProps) {
         return <FileText className="h-10 w-10 text-primary-blue" />
       case "figma":
       case "sketch":
+      case "image":
+      case "png":
+      case "jpg":
+      case "jpeg":
         return <FileImage className="h-10 w-10 text-secondary-purple" />
       case "zip":
+      case "rar":
         return <FileArchive className="h-10 w-10 text-slate" />
       default:
         return <File className="h-10 w-10 text-slate" />
@@ -86,7 +133,7 @@ export default function ProjectFilesPage({ params }: ProjectFilesPageProps) {
   }
 
   // Get unique file types for this project
-  const fileTypes = Array.from(new Set(projectFiles.map((file) => file.type)))
+  const fileTypes = Array.from(new Set(files.map((file) => file.type)))
 
   return (
     <>
@@ -255,13 +302,9 @@ export default function ProjectFilesPage({ params }: ProjectFilesPageProps) {
             </Card>
           )
         ) : (
-          <div className="flex h-60 flex-col items-center justify-center rounded-lg border border-dashed bg-white p-8 text-center">
-            <h3 className="mb-2 text-lg font-medium">No files found</h3>
-            <p className="mb-4 text-sm text-muted-foreground">
-              {searchQuery || typeFilter !== "all"
-                ? "Try adjusting your search or filters"
-                : "Upload your first file to get started"}
-            </p>
+          <div className="rounded-lg border border-dashed p-8 text-center">
+            <h3 className="mb-1 text-lg font-medium">No files found</h3>
+            <p className="mb-4 text-sm text-muted-foreground">Upload files to this project to get started</p>
             <Button className="bg-primary-blue hover:bg-primary-blue/90">
               <Plus className="mr-2 h-4 w-4" />
               Upload File

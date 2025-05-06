@@ -1,21 +1,16 @@
 import type React from "react"
-import { use } from "react"
 import { Sidebar } from "@/components/layout/sidebar"
 
-export default function ProjectLayout({
-  children,
-  params,
-}: Readonly<{
+interface ProjectLayoutProps {
   children: React.ReactNode
   params: Promise<{ id?: string }>
-}>) {
-  const resolvedParams = use(params)
-  
-  // Extract projectId from the URL path
-  const pathname = typeof window !== "undefined" ? window.location.pathname : ""
-  const projectIdMatch = pathname.match(/\/project\/([^/]+)/)
-  const projectId = projectIdMatch ? projectIdMatch[1] : resolvedParams.id || null
+}
 
+export default async function ProjectLayout({ children, params }: Readonly<ProjectLayoutProps>) {
+  // Resolve params using await
+  const resolvedParams = await params;
+  const projectId = resolvedParams.id || null;
+  
   return (
     <div className="flex h-screen bg-cloud-gray">
       <Sidebar className="hidden lg:block" projectId={projectId} />

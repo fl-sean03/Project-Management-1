@@ -7,7 +7,7 @@ import { LayoutDashboard, ListTodo, Calendar, FileText, Users, Settings, Chevron
 import { cn } from "@/lib/utils"
 import { Logo } from "@/components/ui/logo"
 import { Button } from "@/components/ui/button"
-import { projects } from "@/mock/projects"
+import { projectService, Project } from "@/lib/supabase-service"
 
 interface SidebarProps {
   className?: string
@@ -17,7 +17,9 @@ interface SidebarProps {
 export function Sidebar({ className, projectId }: SidebarProps) {
   const pathname = usePathname()
   const [collapsed, setCollapsed] = useState(false)
-  const [currentProjectId, setCurrentProjectId] = useState<string | null>(projectId)
+  const [currentProjectId, setCurrentProjectId] = useState<string | null>(projectId || null)
+  const [project, setProject] = useState<Project | null>(null)
+  const [loading, setLoading] = useState(false)
 
   // Extract project ID from pathname if not provided as prop
   useEffect(() => {
@@ -31,7 +33,29 @@ export function Sidebar({ className, projectId }: SidebarProps) {
     }
   }, [pathname, projectId])
 
-  const project = currentProjectId ? projects.find((p) => p.id === currentProjectId) : null
+  // Fetch project data when currentProjectId changes
+  useEffect(() => {
+    const fetchProject = async () => {
+      if (!currentProjectId) return
+      
+      setLoading(true)
+      try {
+        const { data, error } = await projectService.getProjectById(currentProjectId)
+        if (error) {
+          console.error('Error fetching project:', error)
+          return
+        }
+        
+        setProject(data)
+      } catch (error) {
+        console.error('Error fetching project:', error)
+      } finally {
+        setLoading(false)
+      }
+    }
+    
+    fetchProject()
+  }, [currentProjectId])
 
   const navItems = currentProjectId
     ? [

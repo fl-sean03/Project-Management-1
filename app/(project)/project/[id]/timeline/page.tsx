@@ -1,37 +1,80 @@
 "use client"
 
-import { useState } from "react"
+import { useState, useEffect } from "react"
 import { notFound } from "next/navigation"
-import { use } from "react"
 import { Header } from "@/components/layout/header"
-import { tasks } from "@/mock/tasks"
-import { projects } from "@/mock/projects"
-import { users } from "@/mock/users"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent } from "@/components/ui/card"
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
 import { Badge } from "@/components/ui/badge"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { ChevronLeft, ChevronRight, Plus } from "lucide-react"
+import { projectService, taskService, userService, Task, User, Project } from "@/lib/supabase-service"
 
 interface TimelinePageProps {
-  params: Promise<{
+  params: {
     id: string
-  }>
+  }
 }
 
 export default function TimelinePage({ params }: TimelinePageProps) {
-  const { id } = use(params)
-  const project = projects.find((p) => p.id === id)
-  if (!project) {
-    notFound()
-  }
-
+  const id = params.id
   const [timeframe, setTimeframe] = useState("month")
   const [currentDate, setCurrentDate] = useState(new Date())
+  
+  const [project, setProject] = useState<Project | null>(null)
+  const [tasks, setTasks] = useState<Task[]>([])
+  const [users, setUsers] = useState<User[]>([])
+  const [loading, setLoading] = useState(true)
+  const [error, setError] = useState<string | null>(null)
 
-  // Filter tasks for this project
-  const projectTasks = tasks.filter((task) => task.project === project.id)
+  // Fetch project, tasks, and users data
+  useEffect(() => {
+    const fetchData = async () => {
+      setLoading(true)
+      try {
+        // Fetch project
+        const { data: projectData, error: projectError } = await projectService.getProjectById(id)
+        if (projectError || !projectData) {
+          console.error("Error fetching project:", projectError)
+          throw new Error(projectError?.message || "Failed to fetch project")
+        }
+        setProject(projectData)
+        
+        // Fetch tasks
+        const { data: tasksData, error: tasksError } = await taskService.getTasksByProject(id)
+        if (tasksError) {
+          console.error("Error fetching tasks:", tasksError)
+          throw new Error(tasksError.message)
+        }
+        setTasks(tasksData || [])
+        
+        // Fetch users
+        const { data: usersData, error: usersError } = await userService.getAllUsers()
+        if (usersError) {
+          console.error("Error fetching users:", usersError)
+          throw new Error(usersError.message)
+        }
+        setUsers(usersData || [])
+        
+      } catch (err: any) {
+        setError(err.message || "An error occurred")
+      } finally {
+        setLoading(false)
+      }
+    }
+    
+    fetchData()
+  }, [id])
+
+  // If loading or error, show appropriate UI
+  if (loading) {
+    return <div className="p-4">Loading timeline data...</div>
+  }
+  
+  if (error || !project) {
+    return notFound()
+  }
 
   // Format date for display
   const formatDate = (date: Date): string => {
@@ -79,8 +122,9 @@ export default function TimelinePage({ params }: TimelinePageProps) {
   }
 
   // Check if a task falls on a specific day
-  const getTasksForDay = (day: Date): typeof tasks => {
-    return projectTasks.filter((task) => {
+  const getTasksForDay = (day: Date): Task[] => {
+    return tasks.filter((task) => {
+      if (!task.dueDate) return false;
       const taskDate = new Date(task.dueDate)
       return (
         taskDate.getDate() === day.getDate() &&

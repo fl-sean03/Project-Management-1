@@ -1,15 +1,13 @@
 import { Progress } from "@/components/ui/progress"
 import { Badge } from "@/components/ui/badge"
 import { notFound } from "next/navigation"
-import { use } from "react"
+import { Suspense } from "react"
 import { CheckCircle2, Clock, FolderKanban, Users } from "lucide-react"
 import { StatsCard } from "@/components/dashboard/stats-card"
 import { TaskList } from "@/components/dashboard/task-list"
 import { ActivityFeed } from "@/components/dashboard/activity-feed"
-import { projects } from "@/mock/projects"
-import { tasks } from "@/mock/tasks"
-import { activities } from "@/mock/activities"
 import { Header } from "@/components/layout/header"
+import { projectService, taskService, activityService } from "@/lib/supabase-service"
 
 interface ProjectPageProps {
   params: Promise<{
@@ -17,25 +15,53 @@ interface ProjectPageProps {
   }>
 }
 
-export default function ProjectPage({ params }: ProjectPageProps) {
-  const { id } = use(params)
+export default async function ProjectPage({ params }: ProjectPageProps) {
+  // Using the await approach instead of React.use()
+  const { id } = await params
   
   if (!id) {
     notFound()
   }
 
-  const project = projects.find((p) => p.id === id)
+  // Fetch project data from Supabase
+  const { data: projectData, error: projectError } = await projectService.getProjectById(id)
 
-  if (!project) {
+  if (projectError || !projectData) {
+    console.error("Error fetching project:", projectError)
     notFound()
   }
+  
+  // Sanitize project data to handle missing fields
+  const project = {
+    ...projectData,
+    name: projectData.name || 'Untitled Project',
+    description: projectData.description || 'No description available',
+    status: projectData.status || 'Not Started',
+    priority: projectData.priority || 'Medium',
+    progress: projectData.progress || 0,
+    team: Array.isArray(projectData.team) ? projectData.team : []
+  }
 
-  // Filter tasks for this project
-  const projectTasks = tasks.filter((task) => task.project === project.id)
-  const pendingTasks = projectTasks.filter((task) => task.status !== "Completed")
+  // Fetch tasks for this project
+  const { data: projectTasks = [], error: tasksError } = await taskService.getTasksByProject(project.id)
+  
+  if (tasksError) {
+    console.error("Error fetching tasks:", tasksError)
+  }
+  
+  // Ensure projectTasks is an array, even if null was returned
+  const tasks = (projectTasks || [])
+  const pendingTasks = tasks.filter((task) => task.status !== "Completed")
 
-  // Filter activities for this project
-  const projectActivities = activities.filter((activity) => activity.project === project.id)
+  // Fetch activities for this project
+  const { data: projectActivities = [], error: activitiesError } = await activityService.getActivitiesByProject(project.id)
+  
+  if (activitiesError) {
+    console.error("Error fetching activities:", activitiesError)
+  }
+  
+  // Ensure projectActivities is an array, even if null was returned
+  const activities = (projectActivities || [])
 
   return (
     <>
@@ -79,19 +105,19 @@ export default function ProjectPage({ params }: ProjectPageProps) {
         </div>
 
         <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
-          <StatsCard title="Total Tasks" value={projectTasks.length} icon={FolderKanban} />
+          <StatsCard title="Total Tasks" value={tasks.length} icon={FolderKanban} />
           <StatsCard title="Active Tasks" value={pendingTasks.length} icon={Clock} />
           <StatsCard
             title="Completed Tasks"
-            value={projectTasks.filter((task) => task.status === "Completed").length}
+            value={tasks.filter((task) => task.status === "Completed").length}
             icon={CheckCircle2}
           />
           <StatsCard title="Team Members" value={project.team.length} icon={Users} />
         </div>
 
         <div className="grid gap-6 lg:grid-cols-2">
-          <TaskList tasks={projectTasks} title="Project Tasks" limit={10} />
-          <ActivityFeed activities={projectActivities} limit={10} />
+          <TaskList tasks={tasks} title="Project Tasks" limit={10} />
+          <ActivityFeed activities={activities} limit={10} />
         </div>
       </div>
     </>

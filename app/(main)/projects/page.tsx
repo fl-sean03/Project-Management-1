@@ -1,49 +1,61 @@
 "use client"
 
-import { useState } from "react"
+import { useState, useEffect } from "react"
 import { useRouter } from "next/navigation"
 import { Header } from "@/components/layout/header"
 import { ProjectCard } from "@/components/dashboard/project-card"
-import { projects } from "@/mock/projects"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Plus, Search } from "lucide-react"
+import { projectService, Project } from "@/lib/supabase-service"
 
 export default function ProjectsPage() {
+  const [projects, setProjects] = useState<Project[]>([])
+  const [loading, setLoading] = useState(true)
+  const [error, setError] = useState<string | null>(null)
   const [searchQuery, setSearchQuery] = useState("")
   const [statusFilter, setStatusFilter] = useState("all")
   const [sortBy, setSortBy] = useState("newest")
   const router = useRouter()
 
-  // Filter projects based on search query and status
-  const filteredProjects = projects.filter((project) => {
-    const matchesSearch =
-      project.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      project.description.toLowerCase().includes(searchQuery.toLowerCase())
-
-    const matchesStatus = statusFilter === "all" || project.status === statusFilter
-
-    return matchesSearch && matchesStatus
-  })
-
-  // Sort projects based on selected sort option
-  const sortedProjects = [...filteredProjects].sort((a, b) => {
-    switch (sortBy) {
-      case "newest":
-        return new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
-      case "oldest":
-        return new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime()
-      case "name-asc":
-        return a.name.localeCompare(b.name)
-      case "name-desc":
-        return b.name.localeCompare(a.name)
-      case "due-soon":
-        return new Date(a.dueDate).getTime() - new Date(b.dueDate).getTime()
-      default:
-        return 0
+  useEffect(() => {
+    const fetchProjects = async () => {
+      setLoading(true)
+      setError(null)
+      try {
+        const { data, error } = await projectService.searchProjects(searchQuery, statusFilter, sortBy)
+        
+        if (error) {
+          console.error('Error fetching projects:', error)
+          setError('Failed to load projects. Please try again later.')
+          return
+        }
+        
+        // Make sure we have an array even if data is null
+        const projects = data || []
+        
+        // Ensure each project has the required fields
+        const sanitizedProjects = projects.map(project => ({
+          ...project,
+          team: project.team || [],
+          progress: project.progress || 0,
+          priority: project.priority || 'Medium',
+          status: project.status || 'Not Started',
+          description: project.description || ''
+        }))
+        
+        setProjects(sanitizedProjects)
+      } catch (error) {
+        console.error('Error fetching projects:', error)
+        setError('An unexpected error occurred. Please try again later.')
+      } finally {
+        setLoading(false)
+      }
     }
-  })
+
+    fetchProjects()
+  }, [searchQuery, statusFilter, sortBy])
 
   const handleProjectClick = (projectId: string) => {
     router.push(`/project/${projectId}`)
@@ -96,16 +108,31 @@ export default function ProjectsPage() {
           </div>
         </div>
 
-        {sortedProjects.length > 0 ? (
+        {loading ? (
+          <div className="flex h-60 items-center justify-center">
+            <p>Loading projects...</p>
+          </div>
+        ) : error ? (
+          <div className="flex h-60 flex-col items-center justify-center rounded-lg border border-dashed bg-white p-8 text-center">
+            <h3 className="mb-2 text-lg font-medium text-red-600">Error</h3>
+            <p className="mb-4 text-sm text-muted-foreground">{error}</p>
+            <Button 
+              onClick={() => window.location.reload()} 
+              className="bg-primary-blue hover:bg-primary-blue/90"
+            >
+              Try Again
+            </Button>
+          </div>
+        ) : projects.length > 0 ? (
           <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-            {sortedProjects.map((project) => (
+            {projects.map((project) => (
               <div key={project.id} onClick={() => handleProjectClick(project.id)} className="cursor-pointer">
                 <ProjectCard
                   id={project.id}
                   name={project.name}
                   description={project.description}
                   progress={project.progress}
-                  dueDate={project.dueDate}
+                  dueDate={project.due_date}
                   team={project.team}
                   status={project.status}
                   priority={project.priority}

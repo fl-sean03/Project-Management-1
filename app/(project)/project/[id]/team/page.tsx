@@ -1,54 +1,124 @@
 "use client"
 
 import { notFound } from "next/navigation"
-import { use } from "react"
+import { useState, useEffect } from "react"
 import { Header } from "@/components/layout/header"
-import { projects } from "@/mock/projects"
-import { users } from "@/mock/users"
-import { activities } from "@/mock/activities"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
 import { Mail, Phone, Plus, MapPin, Calendar } from "lucide-react"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
+import { projectService, userService, activityService, Project, User, Activity } from "@/lib/supabase-service"
 
 interface TeamPageProps {
-  params: Promise<{
+  params: {
     id: string
-  }>
+  }
 }
 
 export default function TeamPage({ params }: TeamPageProps) {
-  const { id } = use(params)
-  const project = projects.find((p) => p.id === id)
-  if (!project) {
-    notFound()
-  }
+  // For client components in route handlers, we can access params directly
+  const id = params.id
+  const [project, setProject] = useState<Project | null>(null)
+  const [teamMembers, setTeamMembers] = useState<User[]>([])
+  const [teamActivities, setTeamActivities] = useState<Activity[]>([])
+  const [loading, setLoading] = useState(true)
+  const [error, setError] = useState<string | null>(null)
 
-  // Get team members for this project
-  const teamMembers = project.team
-    .map((userId) => users.find((user) => user.id === userId))
-    .filter(Boolean) as typeof users
+  useEffect(() => {
+    if (!id) {
+      notFound()
+    }
 
-  // Get activities for this project's team members
-  const teamActivities = activities
-    .filter((activity) => project.team.includes(activity.user) && activity.project === project.id)
-    .sort((a, b) => {
-      // Sort by time (assuming newer items have "ago" in their time string)
-      const timeA = a.time
-      const timeB = b.time
-      return timeA.localeCompare(timeB)
-    })
-    .slice(0, 10)
+    const fetchData = async () => {
+      setLoading(true)
+      setError(null)
+      
+      try {
+        // Fetch project
+        const { data: projectData, error: projectError } = await projectService.getProjectById(id)
+        
+        if (projectError || !projectData) {
+          console.error("Error fetching project:", projectError)
+          setError("Failed to load project data")
+          setLoading(false)
+          return
+        }
+        
+        setProject(projectData)
+        
+        // Fetch project members from the project_members table
+        const { data: projectMembersData, error: projectMembersError } = 
+          await projectService.getProjectMembers(id);
+          
+        if (projectMembersError) {
+          console.error("Error fetching project members:", projectMembersError);
+          setError("Failed to load team members");
+          setLoading(false);
+          return;
+        }
+        
+        // Fetch team member details if we have project members
+        if (projectMembersData && projectMembersData.length > 0) {
+          const userIds = projectMembersData.map(member => member.user_id);
+          const teamPromises = userIds.map(userId => userService.getUserById(userId));
+          const teamResults = await Promise.all(teamPromises);
+          
+          const validTeamMembers = teamResults
+            .filter(result => !result.error && result.data)
+            .map(result => result.data);
+          
+          setTeamMembers(validTeamMembers);
+          
+          // Fetch activities
+          const { data: activitiesData, error: activitiesError } = await activityService.getActivitiesByProject(id)
+          
+          if (!activitiesError && activitiesData) {
+            // Filter activities for this project's team members and sort by time
+            const filteredActivities = activitiesData
+              .filter(activity => 
+                userIds.includes(activity.user) && 
+                activity.project === id
+              )
+              .sort((a, b) => {
+                // Sort by created_at timestamp if available
+                const timeA = a.created_at || a.time
+                const timeB = b.created_at || b.time
+                return new Date(timeB).getTime() - new Date(timeA).getTime()
+              })
+              .slice(0, 10)
+            
+            setTeamActivities(filteredActivities)
+          }
+        } else {
+          // No team members found
+          setTeamMembers([]);
+          setTeamActivities([]);
+        }
+        
+      } catch (err) {
+        console.error("Error loading team data:", err)
+        setError("An unexpected error occurred")
+      } finally {
+        setLoading(false)
+      }
+    }
+    
+    fetchData()
+  }, [id])
 
   const formatDate = (dateString: string) => {
-    const date = new Date(dateString)
-    return new Intl.DateTimeFormat("en-US", {
-      month: "long",
-      day: "numeric",
-      year: "numeric",
-    }).format(date)
+    try {
+      const date = new Date(dateString)
+      return new Intl.DateTimeFormat("en-US", {
+        month: "long",
+        day: "numeric",
+        year: "numeric",
+      }).format(date)
+    } catch (e) {
+      return "Invalid date"
+    }
   }
 
   // Handle team member click
@@ -77,6 +147,37 @@ export default function TeamPage({ params }: TeamPageProps) {
     window.dispatchEvent(new CustomEvent("activitychange", { detail: { activityId } }))
   }
 
+  if (loading) {
+    return (
+      <>
+        <Header title="Loading Team..." />
+        <div className="p-4 lg:p-6 flex items-center justify-center h-64">
+          <p>Loading team data...</p>
+        </div>
+      </>
+    )
+  }
+  
+  if (error || !project) {
+    return (
+      <>
+        <Header title="Error" />
+        <div className="p-4 lg:p-6 flex items-center justify-center h-64">
+          <div className="text-center">
+            <h2 className="text-xl font-bold text-red-600 mb-2">Error Loading Team</h2>
+            <p>{error || "Could not find project"}</p>
+            <Button 
+              onClick={() => window.location.reload()} 
+              className="mt-4 bg-primary-blue hover:bg-primary-blue/90"
+            >
+              Try Again
+            </Button>
+          </div>
+        </div>
+      </>
+    )
+  }
+
   return (
     <>
       <Header title={`${project.name} - Team`} />
@@ -96,63 +197,70 @@ export default function TeamPage({ params }: TeamPageProps) {
           </TabsList>
 
           <TabsContent value="members" className="space-y-6">
-            <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
-              {teamMembers.map((member) => (
-                <Card
-                  key={member.id}
-                  className="overflow-hidden cursor-pointer hover:shadow-md transition-shadow"
-                  onClick={() => handleTeamMemberClick(member.id)}
-                >
-                  <CardHeader className="bg-muted/30 pb-2">
-                    <div className="flex items-center gap-4">
-                      <Avatar className="h-12 w-12">
-                        <AvatarImage src={member.avatar || "/placeholder.svg"} alt={member.name} />
-                        <AvatarFallback>
-                          {member.name
-                            .split(" ")
-                            .map((n) => n[0])
-                            .join("")}
-                        </AvatarFallback>
-                      </Avatar>
-                      <div>
-                        <CardTitle className="text-lg">{member.name}</CardTitle>
-                        <p className="text-sm text-muted-foreground">{member.role}</p>
+            {teamMembers.length > 0 ? (
+              <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
+                {teamMembers.map((member) => (
+                  <Card
+                    key={member.id}
+                    className="overflow-hidden cursor-pointer hover:shadow-md transition-shadow"
+                    onClick={() => handleTeamMemberClick(member.id)}
+                  >
+                    <CardHeader className="bg-muted/30 pb-2">
+                      <div className="flex items-center gap-4">
+                        <Avatar className="h-12 w-12">
+                          <AvatarImage src={member.avatar || "/placeholder.svg"} alt={member.name} />
+                          <AvatarFallback>{member.name.split(" ").map((n) => n[0]).join("")}</AvatarFallback>
+                        </Avatar>
+                        <div>
+                          <h3 className="font-medium">{member.name}</h3>
+                          <p className="text-sm text-muted-foreground">{member.role}</p>
+                        </div>
                       </div>
-                    </div>
-                  </CardHeader>
-                  <CardContent className="p-4">
-                    <div className="space-y-3">
-                      <div className="flex items-center gap-2 text-sm">
-                        <Mail className="h-4 w-4 text-muted-foreground" />
-                        <span>{member.email}</span>
+                    </CardHeader>
+                    <CardContent className="pt-2">
+                      <div className="space-y-2">
+                        <div className="flex items-center gap-2 text-sm">
+                          <Mail className="h-4 w-4 text-muted-foreground" />
+                          <span className="text-muted-foreground">{member.email}</span>
+                        </div>
+                        {member.phone && (
+                          <div className="flex items-center gap-2 text-sm">
+                            <Phone className="h-4 w-4 text-muted-foreground" />
+                            <span className="text-muted-foreground">{member.phone}</span>
+                          </div>
+                        )}
+                        {member.department && (
+                          <div className="flex items-center gap-2 text-sm">
+                            <Badge className="bg-primary-blue/10 text-primary-blue">{member.department}</Badge>
+                            {member.location && (
+                              <div className="flex items-center gap-1 text-xs text-muted-foreground">
+                                <MapPin className="h-3 w-3" />
+                                <span>{member.location}</span>
+                              </div>
+                            )}
+                          </div>
+                        )}
+                        {member.joinedDate && (
+                          <div className="flex items-center gap-2 text-xs text-muted-foreground">
+                            <Calendar className="h-3 w-3" />
+                            <span>Joined {formatDate(member.joinedDate)}</span>
+                          </div>
+                        )}
                       </div>
-                      <div className="flex items-center gap-2 text-sm">
-                        <Phone className="h-4 w-4 text-muted-foreground" />
-                        <span>{member.phone}</span>
-                      </div>
-                      <div className="flex items-center gap-2 text-sm">
-                        <MapPin className="h-4 w-4 text-muted-foreground" />
-                        <span>{member.location}</span>
-                      </div>
-                      <div className="flex items-center gap-2 text-sm">
-                        <Calendar className="h-4 w-4 text-muted-foreground" />
-                        <span>Joined {formatDate(member.joinedDate)}</span>
-                      </div>
-                      <div className="pt-2">
-                        <Badge variant="outline">{member.department}</Badge>
-                        <Badge variant="outline" className="ml-2">
-                          {member.team}
-                        </Badge>
-                      </div>
-                      <div className="flex items-center justify-between pt-2 text-sm">
-                        <span className="text-muted-foreground">Last active:</span>
-                        <span>{member.lastActive}</span>
-                      </div>
-                    </div>
-                  </CardContent>
-                </Card>
-              ))}
-            </div>
+                    </CardContent>
+                  </Card>
+                ))}
+              </div>
+            ) : (
+              <div className="rounded-lg border border-dashed p-8 text-center">
+                <h3 className="mb-1 text-lg font-medium">No team members yet</h3>
+                <p className="mb-4 text-sm text-muted-foreground">Add team members to collaborate on this project</p>
+                <Button className="bg-primary-blue hover:bg-primary-blue/90">
+                  <Plus className="mr-2 h-4 w-4" />
+                  Add Team Member
+                </Button>
+              </div>
+            )}
           </TabsContent>
 
           <TabsContent value="activity">
@@ -161,44 +269,43 @@ export default function TeamPage({ params }: TeamPageProps) {
                 <CardTitle>Team Activity</CardTitle>
               </CardHeader>
               <CardContent>
-                <div className="space-y-4">
-                  {teamActivities.map((activity) => {
-                    const user = users.find((u) => u.id === activity.user)
-                    if (!user) return null
+                {teamActivities.length > 0 ? (
+                  <div className="space-y-4">
+                    {teamActivities.map((activity) => {
+                      const member = teamMembers.find((m) => m.id === activity.user)
 
-                    return (
-                      <div
-                        key={activity.id}
-                        className="flex items-start gap-3 border-b pb-4 last:border-0 cursor-pointer hover:bg-muted/50 p-2 rounded-md"
-                        onClick={() => handleActivityClick(activity.id)}
-                      >
-                        <Avatar className="h-8 w-8">
-                          <AvatarImage src={user.avatar || "/placeholder.svg"} alt={user.name} />
-                          <AvatarFallback>
-                            {user.name
-                              .split(" ")
-                              .map((n) => n[0])
-                              .join("")}
-                          </AvatarFallback>
-                        </Avatar>
-                        <div>
-                          <p className="text-sm">
-                            <span className="font-medium">{user.name}</span> {activity.action} {activity.target}{" "}
-                            <span className="font-medium">{activity.targetName}</span>
-                            {activity.content && (
-                              <span className="block mt-1 text-muted-foreground">"{activity.content}"</span>
-                            )}
-                          </p>
-                          <p className="text-xs text-muted-foreground">{activity.time}</p>
+                      return (
+                        <div
+                          key={activity.id}
+                          className="flex items-start gap-3 pb-4 border-b cursor-pointer hover:bg-muted/50"
+                          onClick={() => handleActivityClick(activity.id)}
+                        >
+                          {member && (
+                            <Avatar className="h-8 w-8">
+                              <AvatarImage src={member.avatar || "/placeholder.svg"} alt={member.name} />
+                              <AvatarFallback>{member.name.split(" ").map((n) => n[0]).join("")}</AvatarFallback>
+                            </Avatar>
+                          )}
+                          <div className="flex-1">
+                            <div className="flex items-baseline justify-between">
+                              <p className="font-medium">
+                                {member?.name || "Unknown user"}{" "}
+                                <span className="text-muted-foreground">{activity.action}</span>{" "}
+                                <span className="text-primary-blue">{activity.targetName}</span>
+                              </p>
+                              <span className="text-xs text-muted-foreground">
+                                {activity.created_at ? formatDate(activity.created_at) : activity.time}
+                              </span>
+                            </div>
+                            {activity.content && <p className="mt-1 text-sm text-muted-foreground">{activity.content}</p>}
+                          </div>
                         </div>
-                      </div>
-                    )
-                  })}
-
-                  {teamActivities.length === 0 && (
-                    <div className="text-center py-6 text-muted-foreground">No recent activity for this team</div>
-                  )}
-                </div>
+                      )
+                    })}
+                  </div>
+                ) : (
+                  <div className="py-4 text-center text-muted-foreground">No recent activity from team members</div>
+                )}
               </CardContent>
             </Card>
           </TabsContent>

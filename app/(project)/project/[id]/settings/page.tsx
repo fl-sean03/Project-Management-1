@@ -1,10 +1,8 @@
 "use client"
 
-import { useState } from "react"
+import { useState, useEffect } from "react"
 import { notFound } from "next/navigation"
-import { use } from "react"
 import { Header } from "@/components/layout/header"
-import { projects } from "@/mock/projects"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
@@ -15,31 +13,86 @@ import { Switch } from "@/components/ui/switch"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { Separator } from "@/components/ui/separator"
 import { AlertTriangle, Save, Trash } from "lucide-react"
+import { projectService, Project } from "@/lib/supabase-service"
 
 interface SettingsPageProps {
-  params: Promise<{
+  params: {
     id: string
-  }>
+  }
 }
 
 export default function SettingsPage({ params }: SettingsPageProps) {
-  const { id } = use(params)
-  const project = projects.find((p) => p.id === id)
-  if (!project) {
-    notFound()
-  }
+  const id = params.id
+  const [project, setProject] = useState<Project | null>(null)
+  const [loading, setLoading] = useState(true)
+  const [error, setError] = useState<string | null>(null)
 
-  const [name, setName] = useState(project.name)
-  const [description, setDescription] = useState(project.description)
-  const [status, setStatus] = useState(project.status)
-  const [priority, setPriority] = useState(project.priority)
-  const [category, setCategory] = useState(project.category)
-  const [dueDate, setDueDate] = useState(project.dueDate)
+  const [name, setName] = useState("")
+  const [description, setDescription] = useState("")
+  const [status, setStatus] = useState("")
+  const [priority, setPriority] = useState("")
+  const [category, setCategory] = useState("")
+  const [dueDate, setDueDate] = useState("")
   const [notifications, setNotifications] = useState(true)
   const [publicProject, setPublicProject] = useState(false)
 
-  const handleSave = () => {
-    // In a real app, this would save the project settings
+  // Fetch project data
+  useEffect(() => {
+    const fetchData = async () => {
+      setLoading(true)
+      try {
+        // Fetch project
+        const { data: projectData, error: projectError } = await projectService.getProjectById(id)
+        if (projectError || !projectData) {
+          console.error("Error fetching project:", projectError)
+          throw new Error(projectError?.message || "Failed to fetch project")
+        }
+        setProject(projectData)
+        
+        // Initialize form state with project data
+        setName(projectData.name || "")
+        setDescription(projectData.description || "")
+        setStatus(projectData.status || "")
+        setPriority(projectData.priority || "")
+        setCategory(projectData.category || "")
+        setDueDate(projectData.due_date || "") // Note: using due_date from the DB schema
+        
+      } catch (err: any) {
+        setError(err.message || "An error occurred")
+      } finally {
+        setLoading(false)
+      }
+    }
+    
+    fetchData()
+  }, [id])
+
+  // If loading or error, show appropriate UI
+  if (loading) {
+    return <div className="p-4">Loading project settings...</div>
+  }
+  
+  if (error || !project) {
+    return notFound()
+  }
+
+  const handleSave = async () => {
+    // In a real app, this would update the project settings in Supabase
+    // Example implementation:
+    // const { error } = await projectService.updateProject(id, {
+    //   name,
+    //   description,
+    //   status,
+    //   priority,
+    //   category,
+    //   due_date: dueDate
+    // });
+    
+    // if (error) {
+    //   console.error("Error saving project:", error);
+    //   return;
+    // }
+    
     alert("Settings saved!")
   }
 

@@ -1,13 +1,9 @@
 "use client"
 
-import { useState } from "react"
+import { useState, useEffect } from "react"
 import { useRouter, useSearchParams } from "next/navigation"
 import { notFound } from "next/navigation"
-import { use } from "react"
 import { Header } from "@/components/layout/header"
-import { tasks, taskStatuses } from "@/mock/tasks"
-import { users } from "@/mock/users"
-import { projects } from "@/mock/projects"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
@@ -15,33 +11,88 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
 import { Badge } from "@/components/ui/badge"
 import { CheckCircle2, Clock, Plus, Search } from "lucide-react"
+import { projectService, taskService, userService, Task, User, Project } from "@/lib/supabase-service"
 
 interface ProjectTasksPageProps {
-  params: Promise<{
+  params: {
     id: string
-  }>
+  }
 }
 
+// Define task statuses (this could be moved to the Supabase service later)
+const taskStatuses = [
+  { id: "todo", name: "To Do", color: "#E2E8F0" },
+  { id: "in-progress", name: "In Progress", color: "#236EFF" },
+  { id: "review", name: "Review", color: "#9D27F2" },
+  { id: "completed", name: "Completed", color: "#30D158" },
+]
+
 export default function ProjectTasksPage({ params }: ProjectTasksPageProps) {
-  const { id } = use(params)
-  const project = projects.find((p) => p.id === id)
+  const id = params.id
   const router = useRouter()
   const searchParams = useSearchParams()
 
-  if (!project) {
-    notFound()
-  }
-
+  const [project, setProject] = useState<Project | null>(null)
+  const [tasks, setTasks] = useState<Task[]>([])
+  const [users, setUsers] = useState<User[]>([])
+  const [loading, setLoading] = useState(true)
+  const [error, setError] = useState<string | null>(null)
+  
   const [searchQuery, setSearchQuery] = useState("")
   const [statusFilter, setStatusFilter] = useState("all")
   const [assigneeFilter, setAssigneeFilter] = useState("all")
   const [view, setView] = useState("kanban")
 
-  // Filter tasks for this project
-  const projectTasks = tasks.filter((task) => task.project === project.id)
+  // Fetch project, tasks, and users data
+  useEffect(() => {
+    const fetchData = async () => {
+      setLoading(true)
+      try {
+        // Fetch project
+        const { data: projectData, error: projectError } = await projectService.getProjectById(id)
+        if (projectError || !projectData) {
+          console.error("Error fetching project:", projectError)
+          throw new Error(projectError?.message || "Failed to fetch project")
+        }
+        setProject(projectData)
+        
+        // Fetch tasks
+        const { data: tasksData, error: tasksError } = await taskService.getTasksByProject(id)
+        if (tasksError) {
+          console.error("Error fetching tasks:", tasksError)
+          throw new Error(tasksError.message)
+        }
+        setTasks(tasksData || [])
+        
+        // Fetch users
+        const { data: usersData, error: usersError } = await userService.getAllUsers()
+        if (usersError) {
+          console.error("Error fetching users:", usersError)
+          throw new Error(usersError.message)
+        }
+        setUsers(usersData || [])
+        
+      } catch (err: any) {
+        setError(err.message || "An error occurred")
+      } finally {
+        setLoading(false)
+      }
+    }
+    
+    fetchData()
+  }, [id])
+
+  // If loading or error, show appropriate UI
+  if (loading) {
+    return <div className="p-4">Loading project data...</div>
+  }
+  
+  if (error || !project) {
+    return notFound()
+  }
 
   // Filter tasks based on search query, status, and assignee
-  const filteredTasks = projectTasks.filter((task) => {
+  const filteredTasks = tasks.filter((task) => {
     const matchesSearch =
       task.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
       task.description.toLowerCase().includes(searchQuery.toLowerCase())
@@ -58,7 +109,7 @@ export default function ProjectTasksPage({ params }: ProjectTasksPageProps) {
       acc[status.name] = filteredTasks.filter((task) => task.status === status.name)
       return acc
     },
-    {} as Record<string, typeof tasks>,
+    {} as Record<string, Task[]>,
   )
 
   const getUser = (userId: string) => {
@@ -66,6 +117,7 @@ export default function ProjectTasksPage({ params }: ProjectTasksPageProps) {
   }
 
   const formatDate = (dateString: string) => {
+    if (!dateString) return "No date"
     const date = new Date(dateString)
     return new Intl.DateTimeFormat("en-US", {
       month: "short",
@@ -74,9 +126,10 @@ export default function ProjectTasksPage({ params }: ProjectTasksPageProps) {
   }
 
   const isOverdue = (dateString: string) => {
+    if (!dateString) return false
     const dueDate = new Date(dateString)
     const today = new Date()
-    return dueDate < today && dateString !== ""
+    return dueDate < today
   }
 
   // Handle task click
@@ -203,7 +256,7 @@ export default function ProjectTasksPage({ params }: ProjectTasksPageProps) {
                       </Card>
                     )
                   })}
-                  {tasksByStatus[status.name]?.length === 0 && (
+                  {(tasksByStatus[status.name]?.length || 0) === 0 && (
                     <div className="rounded-lg border border-dashed p-4 text-center text-sm text-muted-foreground">
                       No tasks
                     </div>
@@ -261,9 +314,9 @@ export default function ProjectTasksPage({ params }: ProjectTasksPageProps) {
                             {task.priority}
                           </Badge>
                           {assignee && (
-                            <Avatar className="h-8 w-8">
+                            <Avatar className="h-6 w-6">
                               <AvatarImage src={assignee.avatar || "/placeholder.svg"} alt={assignee.name} />
-                              <AvatarFallback>
+                              <AvatarFallback className="text-xs">
                                 {assignee.name
                                   .split(" ")
                                   .map((n) => n[0])
@@ -276,14 +329,7 @@ export default function ProjectTasksPage({ params }: ProjectTasksPageProps) {
                     )
                   })
                 ) : (
-                  <div className="py-8 text-center">
-                    <h3 className="mb-2 text-lg font-medium">No tasks found</h3>
-                    <p className="mb-4 text-sm text-muted-foreground">Try adjusting your search or filters</p>
-                    <Button className="bg-primary-blue hover:bg-primary-blue/90">
-                      <Plus className="mr-2 h-4 w-4" />
-                      New Task
-                    </Button>
-                  </div>
+                  <div className="py-4 text-center text-muted-foreground">No tasks found</div>
                 )}
               </div>
             </CardContent>
