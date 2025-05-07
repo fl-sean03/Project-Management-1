@@ -9,6 +9,7 @@ import { Input } from "@/components/ui/input"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Plus, Search } from "lucide-react"
 import { projectService, Project } from "@/lib/supabase-service"
+import { NewProjectDialog } from "@/components/projects/new-project-dialog"
 
 export default function ProjectsPage() {
   const [projects, setProjects] = useState<Project[]>([])
@@ -19,46 +20,51 @@ export default function ProjectsPage() {
   const [sortBy, setSortBy] = useState("newest")
   const router = useRouter()
 
-  useEffect(() => {
-    const fetchProjects = async () => {
-      setLoading(true)
-      setError(null)
-      try {
-        const { data, error } = await projectService.searchProjects(searchQuery, statusFilter, sortBy)
-        
-        if (error) {
-          console.error('Error fetching projects:', error)
-          setError('Failed to load projects. Please try again later.')
-          return
-        }
-        
-        // Make sure we have an array even if data is null
-        const projects = data || []
-        
-        // Ensure each project has the required fields
-        const sanitizedProjects = projects.map(project => ({
-          ...project,
-          team: project.team || [],
-          progress: project.progress || 0,
-          priority: project.priority || 'Medium',
-          status: project.status || 'Not Started',
-          description: project.description || ''
-        }))
-        
-        setProjects(sanitizedProjects)
-      } catch (error) {
+  const fetchProjects = async () => {
+    setLoading(true)
+    setError(null)
+    try {
+      const { data, error } = await projectService.searchProjects(searchQuery, statusFilter, sortBy)
+      
+      if (error) {
         console.error('Error fetching projects:', error)
-        setError('An unexpected error occurred. Please try again later.')
-      } finally {
-        setLoading(false)
+        setError('Failed to load projects. Please try again later.')
+        return
       }
+      
+      // Make sure we have an array even if data is null
+      const projects = data || []
+      
+      // Ensure each project has the required fields
+      const sanitizedProjects = projects.map(project => ({
+        ...project,
+        team: project.team || [],
+        progress: project.progress || 0,
+        priority: project.priority || 'Medium',
+        status: project.status || 'Not Started',
+        description: project.description || ''
+      }))
+      
+      setProjects(sanitizedProjects)
+    } catch (error) {
+      console.error('Error fetching projects:', error)
+      setError('An unexpected error occurred. Please try again later.')
+    } finally {
+      setLoading(false)
     }
+  }
 
+  useEffect(() => {
     fetchProjects()
   }, [searchQuery, statusFilter, sortBy])
 
   const handleProjectClick = (projectId: string) => {
     router.push(`/project/${projectId}`)
+  }
+
+  const handleProjectCreated = (newProject: Project) => {
+    // Refresh the projects list after creating a new project
+    fetchProjects()
   }
 
   return (
@@ -101,10 +107,12 @@ export default function ProjectsPage() {
                 <SelectItem value="due-soon">Due Date (Soon First)</SelectItem>
               </SelectContent>
             </Select>
-            <Button className="bg-primary-blue hover:bg-primary-blue/90">
-              <Plus className="mr-2 h-4 w-4" />
-              New Project
-            </Button>
+            <NewProjectDialog onProjectCreated={handleProjectCreated}>
+              <Button className="bg-primary-blue hover:bg-primary-blue/90">
+                <Plus className="mr-2 h-4 w-4" />
+                New Project
+              </Button>
+            </NewProjectDialog>
           </div>
         </div>
 
@@ -148,10 +156,12 @@ export default function ProjectsPage() {
                 ? "Try adjusting your search or filters"
                 : "Create your first project to get started"}
             </p>
-            <Button className="bg-primary-blue hover:bg-primary-blue/90">
-              <Plus className="mr-2 h-4 w-4" />
-              New Project
-            </Button>
+            <NewProjectDialog onProjectCreated={handleProjectCreated}>
+              <Button className="bg-primary-blue hover:bg-primary-blue/90">
+                <Plus className="mr-2 h-4 w-4" />
+                New Project
+              </Button>
+            </NewProjectDialog>
           </div>
         )}
       </div>

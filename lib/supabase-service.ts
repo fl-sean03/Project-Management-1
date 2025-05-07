@@ -33,6 +33,7 @@ export type Project = {
   start_date: string;
   budget: number;
   client: string;
+  owner_id: string;
   objectives: string[];
   milestones: any[];
 };
@@ -156,6 +157,50 @@ export const projectService = {
       .from('project_members')
       .select('user_id')
       .eq('project_id', projectId);
+  },
+  
+  // Add method to add a team member to a project
+  async addProjectMember(projectId: string, userId: string) {
+    const supabase = getSupabaseClient();
+    return await supabase
+      .from('project_members')
+      .insert([{
+        project_id: projectId,
+        user_id: userId
+      }]);
+  },
+  
+  // Add create project method
+  async createProject(projectData: Partial<Project>) {
+    const supabase = getSupabaseClient();
+    
+    // Ensure created_at is set
+    const now = new Date().toISOString();
+    
+    // Create a copy of the data without the team field
+    const { team, ...projectDataWithoutTeam } = projectData;
+    
+    // Make sure we have an owner_id (required field)
+    if (!projectDataWithoutTeam.owner_id) {
+      // Get the current user as the owner if not specified
+      const { data: userData } = await supabase.auth.getUser();
+      if (userData?.user?.id) {
+        projectDataWithoutTeam.owner_id = userData.user.id;
+      } else {
+        // If no user is available, we'll need a default owner ID
+        // This is a fallback for testing/development
+        projectDataWithoutTeam.owner_id = "00000000-0000-0000-0000-000000000001";
+      }
+    }
+    
+    return await supabase
+      .from('projects')
+      .insert([{
+        ...projectDataWithoutTeam,
+        created_at: now,
+        status: projectData.status || 'Not Started',
+        progress: projectData.progress || 0
+      }]);
   }
 };
 

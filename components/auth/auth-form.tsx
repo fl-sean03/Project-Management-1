@@ -73,7 +73,7 @@ export function AuthForm() {
 
   const handleDemoAccess = () => {
     // For demo purposes, we'll just redirect to the dashboard page
-    router.push("/dashboard")
+    router.push("/projects")
   }
 
   const handlePasswordReset = async (e: React.FormEvent) => {
