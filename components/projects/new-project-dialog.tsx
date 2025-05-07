@@ -126,9 +126,57 @@ export function NewProjectDialog({ children, onProjectCreated }: NewProjectDialo
       
       // Call onProjectCreated callback if provided
       if (onProjectCreated && data) {
-        // Supabase returns the inserted records in the data property
-        const createdProject = data[0] as unknown as Project
-        onProjectCreated(createdProject)
+        // Log the raw data returned from Supabase for debugging
+        console.log("Raw data returned from insert:", data);
+        
+        // IMPORTANT FIX: Supabase returns the inserted records in the data property
+        // The shape of the returned data is different than expected
+        // We need to safely access this data with proper type casting
+        let projectData: Partial<Project> = {};
+        
+        // Handle both formats: array of projects or single project object
+        if (Array.isArray(data) && data.length > 0) {
+          // When .select() is used with insert(), Supabase returns an array
+          projectData = data[0] as Partial<Project>;
+        } else if (typeof data === 'object' && data !== null) {
+          // In some cases it might return a direct object
+          projectData = data as Partial<Project>;
+        } else {
+          console.error("Unexpected data format from Supabase:", data);
+          return; // If we can't process the data, don't continue
+        }
+        
+        // Log the extracted project data
+        console.log("Extracted project data:", projectData);
+        
+        // Make sure all required fields are present before passing to the callback
+        const completeProject: Project = {
+          id: projectData.id || '',
+          name: projectData.name || '',
+          description: projectData.description || '',
+          team: projectData.team || [],
+          progress: projectData.progress || 0,
+          priority: projectData.priority || 'Medium',
+          status: projectData.status || 'Not Started',
+          due_date: projectData.due_date || '',
+          created_at: projectData.created_at || new Date().toISOString(),
+          category: projectData.category || 'General',
+          // Add required fields that might be missing with default values
+          tasks: 0,
+          completed_tasks: 0,
+          start_date: '',
+          budget: 0,
+          client: '',
+          owner_id: projectData.owner_id || '',
+          objectives: [],
+          milestones: []
+        };
+        
+        // Log the complete project being passed to the callback
+        console.log("Complete project passed to callback:", completeProject);
+        
+        // Pass the complete project to the callback
+        onProjectCreated(completeProject);
       }
       
     } catch (error: any) {

@@ -117,20 +117,28 @@ export const projectService = {
   
   async searchProjects(searchQuery = '', statusFilter = 'all', sortBy = 'newest') {
     const supabase = getSupabaseClient();
-    let query = supabase.from('projects').select('*');
+    console.log(`Searching projects with query: "${searchQuery}", status: "${statusFilter}", sort: "${sortBy}"`);
     
-    if (statusFilter !== 'all') {
-      query = query.eq('status', statusFilter);
-    }
+    // Add a timestamp to force a fresh query every time
+    const timestamp = new Date().getTime();
     
+    // Start building the query
+    let query = supabase
+      .from('projects')
+      .select('*');
+    
+    // Add search filter if provided
     if (searchQuery) {
       query = query.or(`name.ilike.%${searchQuery}%,description.ilike.%${searchQuery}%`);
     }
     
+    // Add status filter if not 'all'
+    if (statusFilter !== 'all') {
+      query = query.eq('status', statusFilter);
+    }
+    
+    // Add sorting based on sortBy parameter
     switch (sortBy) {
-      case 'newest':
-        query = query.order('created_at', { ascending: false });
-        break;
       case 'oldest':
         query = query.order('created_at', { ascending: true });
         break;
@@ -147,7 +155,12 @@ export const projectService = {
         query = query.order('created_at', { ascending: false });
     }
     
-    return await query;
+    // Log the timestamp to show this is a fresh query
+    console.log(`Query executed at timestamp: ${timestamp}`);
+    
+    const result = await query;
+    console.log("Supabase returned projects:", result);
+    return result;
   },
 
   // Add this method to the projectService
@@ -200,7 +213,8 @@ export const projectService = {
         created_at: now,
         status: projectData.status || 'Not Started',
         progress: projectData.progress || 0
-      }]);
+      }])
+      .select();
   }
 };
 

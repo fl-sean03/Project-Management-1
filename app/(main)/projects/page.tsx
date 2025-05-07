@@ -18,13 +18,17 @@ export default function ProjectsPage() {
   const [searchQuery, setSearchQuery] = useState("")
   const [statusFilter, setStatusFilter] = useState("all")
   const [sortBy, setSortBy] = useState("newest")
+  const [refreshTrigger, setRefreshTrigger] = useState(0)
   const router = useRouter()
 
   const fetchProjects = async () => {
+    console.log("Starting fetchProjects()...");
     setLoading(true)
     setError(null)
     try {
       const { data, error } = await projectService.searchProjects(searchQuery, statusFilter, sortBy)
+      
+      console.log("Raw data returned from searchProjects:", data);
       
       if (error) {
         console.error('Error fetching projects:', error)
@@ -45,7 +49,11 @@ export default function ProjectsPage() {
         description: project.description || ''
       }))
       
+      console.log("Sanitized projects to set state:", sanitizedProjects);
+      
+      // Set the projects state
       setProjects(sanitizedProjects)
+      console.log("Projects state updated successfully");
     } catch (error) {
       console.error('Error fetching projects:', error)
       setError('An unexpected error occurred. Please try again later.')
@@ -55,16 +63,65 @@ export default function ProjectsPage() {
   }
 
   useEffect(() => {
-    fetchProjects()
-  }, [searchQuery, statusFilter, sortBy])
+    console.log("useEffect triggered with refreshTrigger:", refreshTrigger);
+    fetchProjects();
+  }, [searchQuery, statusFilter, sortBy, refreshTrigger])
 
   const handleProjectClick = (projectId: string) => {
     router.push(`/project/${projectId}`)
   }
 
   const handleProjectCreated = (newProject: Project) => {
-    // Refresh the projects list after creating a new project
-    fetchProjects()
+    // Log the incoming project data
+    console.log("ProjectsPage received new project:", newProject);
+    console.log("Current projects state before update:", projects);
+    
+    // Immediately add the new project to the state
+    const sanitizedNewProject = {
+      ...newProject,
+      team: newProject.team || [],
+      progress: newProject.progress || 0,
+      priority: newProject.priority || 'Medium',
+      status: newProject.status || 'Not Started',
+      description: newProject.description || ''
+    }
+    
+    console.log("Sanitized project to add to state:", sanitizedNewProject);
+    
+    // Temporarily disable loading to prevent loading indicator
+    setLoading(false);
+    
+    // Force update by directly modifying state instead of using the callback pattern
+    // This ensures React detects the state change more reliably
+    const updatedProjects = [...projects];
+    
+    // Check if the project is already in the list to avoid duplicates
+    const existingIndex = updatedProjects.findIndex(p => p.id === newProject.id);
+    
+    if (existingIndex >= 0) {
+      console.log("Project already exists in state, updating...");
+      updatedProjects[existingIndex] = sanitizedNewProject;
+    } else {
+      console.log("Adding new project to state...");
+      // If sorting by newest first, add to beginning, otherwise add at end 
+      // and we'll refresh after to ensure proper sorting
+      if (sortBy === 'newest') {
+        updatedProjects.unshift(sanitizedNewProject);
+      } else {
+        updatedProjects.push(sanitizedNewProject);
+      }
+    }
+    
+    console.log("Setting projects state to:", updatedProjects);
+    setProjects(updatedProjects);
+    console.log("Projects state after direct update:", updatedProjects);
+    
+    // Also refresh to ensure server data is in sync
+    setTimeout(() => {
+      console.log("Refreshing projects from server...");
+      // Increment the refresh trigger to force a re-fetch
+      setRefreshTrigger(prev => prev + 1);
+    }, 500); // Small delay to ensure database consistency
   }
 
   return (
@@ -116,7 +173,7 @@ export default function ProjectsPage() {
           </div>
         </div>
 
-        {loading ? (
+        {loading && projects.length === 0 ? (
           <div className="flex h-60 items-center justify-center">
             <p>Loading projects...</p>
           </div>
