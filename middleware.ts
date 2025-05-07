@@ -65,7 +65,7 @@ export async function middleware(req: NextRequest) {
   
   // Redirect authenticated users away from auth pages
   if (isAuthRoute && session) {
-    return NextResponse.redirect(new URL('/dashboard', req.url));
+    return NextResponse.redirect(new URL('/projects', req.url));
   }
   
   // Do not redirect for reset-password route, as it needs to be accessible regardless of auth status
