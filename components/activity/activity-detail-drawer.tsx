@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useEffect } from "react"
+import { useState, useEffect, Suspense } from "react"
 import { usePathname, useSearchParams } from "next/navigation"
 import { Calendar, Clock, User2, FileText, MessageSquare, ExternalLink, ThumbsUp, Share2 } from "lucide-react"
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
@@ -18,7 +18,8 @@ interface ActivityDetailDrawerProps {
   projectId?: string
 }
 
-export function ActivityDetailDrawer({ projectId }: ActivityDetailDrawerProps) {
+// Inner component that uses search params
+function ActivityDetailContent({ projectId }: ActivityDetailDrawerProps) {
   const pathname = usePathname()
   const searchParams = useSearchParams()
   const activityId = searchParams.get("activityId")
@@ -185,16 +186,11 @@ export function ActivityDetailDrawer({ projectId }: ActivityDetailDrawerProps) {
   }
 
   return (
-    <Sheet
-      open={isOpen}
-      onOpenChange={(open) => {
-        if (!open) handleClose()
-      }}
-    >
-      <SheetContent
-        side={isMobile ? "bottom" : "right"}
-        className={`p-0 ${isMobile ? "h-[90%] rounded-t-lg" : "w-[600px] max-w-[60%]"}`}
-      >
+    <Sheet open={isOpen} onOpenChange={handleClose}>
+      <SheetContent side={isMobile ? "bottom" : "right"} className={isMobile ? "h-[80%]" : ""}>
+        <SheetHeader className="pb-4">
+          <SheetTitle>Activity Details</SheetTitle>
+        </SheetHeader>
         <div className="flex h-full flex-col overflow-hidden">
           {/* Header */}
           <SheetHeader className="border-b p-4">
@@ -390,5 +386,14 @@ export function ActivityDetailDrawer({ projectId }: ActivityDetailDrawerProps) {
         </div>
       </SheetContent>
     </Sheet>
+  )
+}
+
+// Main component with Suspense
+export function ActivityDetailDrawer(props: ActivityDetailDrawerProps) {
+  return (
+    <Suspense fallback={<div className="hidden">Loading activity details...</div>}>
+      <ActivityDetailContent {...props} />
+    </Suspense>
   )
 }
