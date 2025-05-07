@@ -2,7 +2,7 @@
 
 import type React from "react"
 
-import { useState } from "react"
+import { useState, Suspense } from "react"
 import { useRouter } from "next/navigation"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
@@ -14,7 +14,8 @@ import { ZyraLogo } from "@/components/zyra-logo"
 import { useAuth } from "@/lib/auth-context"
 import { useSearchParams } from "next/navigation"
 
-export function AuthForm() {
+// Inner component that uses search params
+function AuthFormContent() {
   const { signIn, signUp, resetPassword } = useAuth()
   const [email, setEmail] = useState("")
   const [password, setPassword] = useState("")
@@ -382,5 +383,24 @@ export function AuthForm() {
         </div>
       )}
     </Card>
+  )
+}
+
+// Main component with Suspense
+export function AuthForm() {
+  return (
+    <Suspense fallback={
+      <Card className="w-full max-w-md overflow-hidden border-none shadow-lg">
+        <div className="bg-gradient-to-r from-primary-blue to-secondary-purple p-6 text-center text-white">
+          <div className="mx-auto mb-4 flex h-16 w-16 items-center justify-center rounded-full bg-white/20 backdrop-blur-sm">
+            <ZyraLogo size="lg" />
+          </div>
+          <CardTitle className="text-2xl font-bold">Zyra</CardTitle>
+          <CardDescription className="text-blue-100">Loading...</CardDescription>
+        </div>
+      </Card>
+    }>
+      <AuthFormContent />
+    </Suspense>
   )
 } 

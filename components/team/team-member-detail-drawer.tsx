@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useEffect } from "react"
+import { useState, useEffect, Suspense } from "react"
 import { usePathname, useSearchParams } from "next/navigation"
 import {
   Mail,
@@ -28,7 +28,8 @@ interface TeamMemberDetailDrawerProps {
   projectId?: string
 }
 
-export function TeamMemberDetailDrawer({ projectId }: TeamMemberDetailDrawerProps) {
+// Inner component that uses search params
+function TeamMemberDetailContent({ projectId }: TeamMemberDetailDrawerProps) {
   const pathname = usePathname()
   const searchParams = useSearchParams()
   const userId = searchParams.get("userId")
@@ -401,5 +402,14 @@ export function TeamMemberDetailDrawer({ projectId }: TeamMemberDetailDrawerProp
         </div>
       </SheetContent>
     </Sheet>
+  )
+}
+
+// Main component with Suspense
+export function TeamMemberDetailDrawer(props: TeamMemberDetailDrawerProps) {
+  return (
+    <Suspense fallback={<div className="hidden">Loading team member details...</div>}>
+      <TeamMemberDetailContent {...props} />
+    </Suspense>
   )
 }

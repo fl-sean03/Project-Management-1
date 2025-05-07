@@ -2,7 +2,7 @@
 
 import type React from "react"
 
-import { useState, useEffect } from "react"
+import { useState, useEffect, Suspense } from "react"
 import { useRouter, usePathname, useSearchParams } from "next/navigation"
 import { Clock, Calendar, User2, Tag, Paperclip, MessageSquare, CheckSquare } from "lucide-react"
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
@@ -18,7 +18,8 @@ interface TaskDetailDrawerProps {
   projectId: string
 }
 
-export function TaskDetailDrawer({ projectId }: TaskDetailDrawerProps) {
+// Inner component that uses search params
+function TaskDetailContent({ projectId }: TaskDetailDrawerProps) {
   const router = useRouter()
   const pathname = usePathname()
   const searchParams = useSearchParams()
@@ -361,5 +362,14 @@ export function TaskDetailDrawer({ projectId }: TaskDetailDrawerProps) {
         </div>
       </SheetContent>
     </Sheet>
+  )
+}
+
+// Main component with Suspense
+export function TaskDetailDrawer(props: TaskDetailDrawerProps) {
+  return (
+    <Suspense fallback={<div className="hidden">Loading task details...</div>}>
+      <TaskDetailContent {...props} />
+    </Suspense>
   )
 }

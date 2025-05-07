@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useEffect } from "react"
+import { useState, useEffect, Suspense } from "react"
 import { useRouter, usePathname, useSearchParams } from "next/navigation"
 import { CheckCircle2, Circle, Clock } from "lucide-react"
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
@@ -24,7 +24,8 @@ interface TaskListProps {
   limit?: number
 }
 
-export function TaskList({ tasks, title, limit = 5 }: TaskListProps) {
+// Inner component that uses useSearchParams
+function TaskListContent({ tasks, title, limit = 5 }: TaskListProps) {
   const router = useRouter()
   const pathname = usePathname()
   const searchParams = useSearchParams()
@@ -181,5 +182,23 @@ export function TaskList({ tasks, title, limit = 5 }: TaskListProps) {
         </div>
       </CardContent>
     </Card>
+  )
+}
+
+// Main component with Suspense
+export function TaskList(props: TaskListProps) {
+  return (
+    <Suspense fallback={
+      <Card>
+        <CardHeader className="pb-2">
+          <CardTitle className="text-lg">{props.title}</CardTitle>
+        </CardHeader>
+        <CardContent>
+          <div className="py-4 text-center text-sm text-muted-foreground">Loading tasks...</div>
+        </CardContent>
+      </Card>
+    }>
+      <TaskListContent {...props} />
+    </Suspense>
   )
 }

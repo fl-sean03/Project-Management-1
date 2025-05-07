@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useEffect } from "react"
+import { useState, useEffect, Suspense } from "react"
 import { useRouter, useSearchParams } from "next/navigation"
 import { notFound } from "next/navigation"
 import { Header } from "@/components/layout/header"
@@ -27,7 +27,8 @@ const taskStatuses = [
   { id: "completed", name: "Completed", color: "#30D158" },
 ]
 
-export default function ProjectTasksPage({ params }: ProjectTasksPageProps) {
+// Inner component that uses search params
+function ProjectTasksContent({ params }: ProjectTasksPageProps) {
   const id = params.id
   const router = useRouter()
   const searchParams = useSearchParams()
@@ -337,5 +338,14 @@ export default function ProjectTasksPage({ params }: ProjectTasksPageProps) {
         )}
       </div>
     </>
+  )
+}
+
+// Main component with Suspense
+export default function ProjectTasksPage(props: ProjectTasksPageProps) {
+  return (
+    <Suspense fallback={<div>Loading project tasks...</div>}>
+      <ProjectTasksContent {...props} />
+    </Suspense>
   )
 }
