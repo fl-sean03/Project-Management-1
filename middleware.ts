@@ -1,10 +1,20 @@
 import { NextResponse } from 'next/server';
 import type { NextRequest } from 'next/server';
-import { createServerClient } from '@supabase/ssr';
-import { createClient } from '@supabase/supabase-js';
+import { createServerClient, type CookieOptions } from '@supabase/ssr';
 
 export async function middleware(req: NextRequest) {
   const res = NextResponse.next();
+  
+  // Check auth status for protected routes
+  const { pathname } = req.nextUrl;
+  
+  // Skip authentication check for callback route
+  // This will be handled by the callback route handler 
+  const isCallback = pathname.startsWith('/auth/callback');
+  if (isCallback) {
+    // Let the callback route handle the authentication
+    return res;
+  }
   
   // Create a Supabase client configured to use cookies
   const supabase = createServerClient(
@@ -12,10 +22,10 @@ export async function middleware(req: NextRequest) {
     process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
     {
       cookies: {
-        get(name) {
+        get(name: string) {
           return req.cookies.get(name)?.value;
         },
-        set(name, value, options) {
+        set(name: string, value: string, options: CookieOptions) {
           // If the cookie is updated, update the cookies for the request and response
           req.cookies.set({
             name,
@@ -28,7 +38,7 @@ export async function middleware(req: NextRequest) {
             ...options,
           });
         },
-        remove(name, options) {
+        remove(name: string, options: CookieOptions) {
           req.cookies.set({
             name,
             value: '',
@@ -47,8 +57,6 @@ export async function middleware(req: NextRequest) {
   // Refresh session if expired
   await supabase.auth.getSession();
   
-  // Check auth status for protected routes
-  const { pathname } = req.nextUrl;
   const isProtectedRoute = pathname.startsWith('/dashboard') || 
                            pathname.startsWith('/project') || 
                            pathname === '/projects';
@@ -136,6 +144,8 @@ export const config = {
     '/login',
     '/signup',
     '/reset-password',
+    // Auth callback route
+    '/auth/callback',
     // Main public pages
     '/',
   ],

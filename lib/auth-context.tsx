@@ -13,6 +13,7 @@ type AuthContextType = {
   signUp: (email: string, password: string) => Promise<void>;
   signOut: () => Promise<void>;
   resetPassword: (email: string) => Promise<void>;
+  signInWithGoogle: () => Promise<void>;
 };
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
@@ -52,15 +53,21 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
 
     // Set up listener for auth state changes
     const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
+      console.log('Auth state changed:', _event, session ? 'session exists' : 'no session');
       setSession(session);
       setUser(session?.user ?? null);
       setLoading(false);
+      
+      // Handle redirect after successful authentication
+      if (session && window.location.pathname.includes('/auth/callback')) {
+        router.push('/projects');
+      }
     });
 
     return () => {
       subscription.unsubscribe();
     };
-  }, []);
+  }, [router]);
 
   // Sign in with email and password
   const signIn = async (email: string, password: string) => {
@@ -82,11 +89,46 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
     }
   };
 
+  // Sign in with Google OAuth
+  const signInWithGoogle = async () => {
+    try {
+      console.log('Starting Google sign-in flow...');
+      const { data, error } = await supabase.auth.signInWithOAuth({
+        provider: 'google',
+        options: {
+          redirectTo: `${window.location.origin}/auth/callback`,
+          queryParams: {
+            access_type: 'offline',
+            prompt: 'consent',
+          },
+        },
+      });
+      
+      if (error) {
+        console.error('Error during Google OAuth:', error);
+        throw error;
+      }
+      
+      console.log('Google sign-in initiated, redirecting user...', data);
+      // The redirect happens automatically by Supabase
+    } catch (error) {
+      console.error('Error signing in with Google:', error);
+      setLoading(false);
+      throw error;
+    }
+  };
+
   // Sign up with email and password
   const signUp = async (email: string, password: string) => {
     try {
       setLoading(true);
-      const { error } = await supabase.auth.signUp({ email, password });
+      const { error } = await supabase.auth.signUp({ 
+        email, 
+        password,
+        options: {
+          emailRedirectTo: `${window.location.origin}/login`,
+        }
+      });
       
       if (error) {
         throw error;
@@ -144,6 +186,7 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
     signUp,
     signOut,
     resetPassword,
+    signInWithGoogle,
   };
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
