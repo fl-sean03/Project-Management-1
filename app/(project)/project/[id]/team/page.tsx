@@ -10,6 +10,7 @@ import { Badge } from "@/components/ui/badge"
 import { Mail, Phone, Plus, MapPin, Calendar } from "lucide-react"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { projectService, userService, activityService, Project, User, Activity } from "@/lib/supabase-service"
+import { TeamInviteDialog } from "@/components/projects/team-invite-dialog"
 
 interface TeamPageProps {
   params: {
@@ -184,10 +185,18 @@ export default function TeamPage({ params }: TeamPageProps) {
       <div className="p-4 lg:p-6 space-y-6">
         <div className="flex flex-col justify-between gap-4 sm:flex-row sm:items-center">
           <h2 className="text-xl font-bold">Project Team</h2>
-          <Button className="bg-primary-blue hover:bg-primary-blue/90">
-            <Plus className="mr-2 h-4 w-4" />
-            Add Team Member
-          </Button>
+          <TeamInviteDialog 
+            projectId={id}
+            onMemberAdded={(user) => {
+              // Add the new member to the teamMembers state
+              setTeamMembers(prev => [...prev, user]);
+            }}
+          >
+            <Button className="bg-primary-blue hover:bg-primary-blue/90">
+              <Plus className="mr-2 h-4 w-4" />
+              Add Team Member
+            </Button>
+          </TeamInviteDialog>
         </div>
 
         <Tabs defaultValue="members">

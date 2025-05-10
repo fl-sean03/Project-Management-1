@@ -1,6 +1,7 @@
 "use client"
 
-import { useState, useEffect } from "react"
+import React, { useState, useEffect } from "react"
+import { useParams } from "next/navigation"
 import { notFound } from "next/navigation"
 import { Header } from "@/components/layout/header"
 import { Button } from "@/components/ui/button"
@@ -12,7 +13,7 @@ import {
   FileText,
   FileImage,
   FileArchive,
-  File,
+  File as FileIcon,
   Plus,
   Search,
   Grid,
@@ -21,7 +22,9 @@ import {
   MoreHorizontal,
 } from "lucide-react"
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu"
-import { projectService, userService, Project, User, File as FileType } from "@/lib/supabase-service"
+import { projectService, userService, fileService, Project, User, File as FileType } from "@/lib/supabase-service"
+import { FileUploadDialog } from "@/components/projects/file-upload-dialog"
+import { FileDownloadButton } from "@/components/projects/file-download-button"
 
 interface ProjectFilesPageProps {
   params: {
@@ -29,11 +32,19 @@ interface ProjectFilesPageProps {
   }
 }
 
+// We need to extend the FileType to include spaces properties
+interface FileWithStorage extends FileType {
+  space_key: string;
+  space_name: string;
+  is_public: boolean;
+}
+
 export default function ProjectFilesPage({ params }: ProjectFilesPageProps) {
-  const id = params.id
+  const routeParams = useParams<{ id: string }>()
+  const id = routeParams.id
   
   const [project, setProject] = useState<Project | null>(null)
-  const [files, setFiles] = useState<FileType[]>([])
+  const [files, setFiles] = useState<FileWithStorage[]>([])
   const [users, setUsers] = useState<User[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
@@ -55,11 +66,13 @@ export default function ProjectFilesPage({ params }: ProjectFilesPageProps) {
         }
         setProject(projectData)
         
-        // For files, we would need a service method to fetch files by project
-        // This is a placeholder - you would need to implement this in your service
-        // const { data: filesData, error: filesError } = await fileService.getFilesByProject(id)
-        // For now, we'll use an empty array
-        setFiles([])
+        // Fetch files for this project
+        const { data: filesData, error: filesError } = await fileService.getFilesByProject(id)
+        if (filesError) {
+          console.error("Error fetching files:", filesError)
+          throw new Error(filesError.message)
+        }
+        setFiles(filesData as FileWithStorage[] || [])
         
         // Fetch users
         const { data: usersData, error: usersError } = await userService.getAllUsers()
@@ -113,27 +126,33 @@ export default function ProjectFilesPage({ params }: ProjectFilesPageProps) {
   const getFileIcon = (fileType: string) => {
     switch (fileType) {
       case "pdf":
-      case "word":
-      case "powerpoint":
-      case "markdown":
+      case "doc":
+      case "docx":
+      case "txt":
+      case "md":
         return <FileText className="h-10 w-10 text-primary-blue" />
-      case "figma":
-      case "sketch":
-      case "image":
-      case "png":
       case "jpg":
       case "jpeg":
+      case "png":
+      case "gif":
+      case "svg":
         return <FileImage className="h-10 w-10 text-secondary-purple" />
       case "zip":
       case "rar":
-        return <FileArchive className="h-10 w-10 text-slate" />
+        return <FileArchive className="h-10 w-10 text-slate-500" />
       default:
-        return <File className="h-10 w-10 text-slate" />
+        return <FileIcon className="h-10 w-10 text-slate-500" />
     }
   }
 
-  // Get unique file types for this project
+  // Get unique file types for filtering
   const fileTypes = Array.from(new Set(files.map((file) => file.type)))
+
+  // Handle new file upload
+  const handleFileUploaded = (file: FileType) => {
+    // Add the new file to the list
+    setFiles(prevFiles => [file as FileWithStorage, ...prevFiles])
+  }
 
   return (
     <>
@@ -182,10 +201,15 @@ export default function ProjectFilesPage({ params }: ProjectFilesPageProps) {
                 <List className="h-4 w-4" />
               </Button>
             </div>
-            <Button className="bg-primary-blue hover:bg-primary-blue/90">
-              <Plus className="mr-2 h-4 w-4" />
-              Upload File
-            </Button>
+            <FileUploadDialog 
+              projectId={id}
+              onFileUploaded={handleFileUploaded}
+            >
+              <Button className="bg-primary-blue hover:bg-primary-blue/90">
+                <Plus className="mr-2 h-4 w-4" />
+                Upload File
+              </Button>
+            </FileUploadDialog>
           </div>
         </div>
 
@@ -217,6 +241,9 @@ export default function ProjectFilesPage({ params }: ProjectFilesPageProps) {
                             </Avatar>
                           )}
                           <span className="text-xs text-muted-foreground">{formatDate(file.uploadedAt)}</span>
+                        </div>
+                        <div className="mt-3 flex w-full justify-center">
+                          <FileDownloadButton file={file} />
                         </div>
                       </div>
                     </CardContent>
@@ -274,9 +301,7 @@ export default function ProjectFilesPage({ params }: ProjectFilesPageProps) {
                             <td className="px-4 py-3 text-sm">{formatDate(file.uploadedAt)}</td>
                             <td className="px-4 py-3">
                               <div className="flex items-center gap-1">
-                                <Button variant="ghost" size="icon">
-                                  <Download className="h-4 w-4" />
-                                </Button>
+                                <FileDownloadButton file={file} />
                                 <DropdownMenu>
                                   <DropdownMenuTrigger asChild>
                                     <Button variant="ghost" size="icon">
@@ -305,10 +330,15 @@ export default function ProjectFilesPage({ params }: ProjectFilesPageProps) {
           <div className="rounded-lg border border-dashed p-8 text-center">
             <h3 className="mb-1 text-lg font-medium">No files found</h3>
             <p className="mb-4 text-sm text-muted-foreground">Upload files to this project to get started</p>
-            <Button className="bg-primary-blue hover:bg-primary-blue/90">
-              <Plus className="mr-2 h-4 w-4" />
-              Upload File
-            </Button>
+            <FileUploadDialog 
+              projectId={id}
+              onFileUploaded={handleFileUploaded}
+            >
+              <Button className="bg-primary-blue hover:bg-primary-blue/90">
+                <Plus className="mr-2 h-4 w-4" />
+                Upload File
+              </Button>
+            </FileUploadDialog>
           </div>
         )}
       </div>

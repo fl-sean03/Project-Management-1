@@ -1,7 +1,7 @@
 "use client"
 
-import { useState, useEffect, Suspense } from "react"
-import { useRouter, useSearchParams } from "next/navigation"
+import React, { useState, useEffect, Suspense } from "react"
+import { useRouter, useSearchParams, useParams } from "next/navigation"
 import { notFound } from "next/navigation"
 import { Header } from "@/components/layout/header"
 import { Button } from "@/components/ui/button"
@@ -12,6 +12,7 @@ import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
 import { Badge } from "@/components/ui/badge"
 import { CheckCircle2, Clock, Plus, Search } from "lucide-react"
 import { projectService, taskService, userService, Task, User, Project } from "@/lib/supabase-service"
+import { NewTaskDialog } from "@/components/projects/new-task-dialog"
 
 interface ProjectTasksPageProps {
   params: {
@@ -29,7 +30,10 @@ const taskStatuses = [
 
 // Inner component that uses search params
 function ProjectTasksContent({ params }: ProjectTasksPageProps) {
-  const id = params.id
+  // Use the useParams hook to get the route params
+  const routeParams = useParams<{ id: string }>()
+  // Access the id from routeParams
+  const id = routeParams.id
   const router = useRouter()
   const searchParams = useSearchParams()
 
@@ -141,6 +145,36 @@ function ProjectTasksContent({ params }: ProjectTasksPageProps) {
     router.push(`${window.location.pathname}?${params.toString()}`)
   }
 
+  // Handle task created
+  const handleTaskCreated = (newTask: Task) => {
+    // Add the new task to the list
+    setTasks(prevTasks => [...prevTasks, newTask])
+  }
+
+  // Handle task status update
+  const handleTaskStatusUpdate = async (taskId: string, newStatus: string) => {
+    try {
+      const { data, error } = await taskService.updateTaskStatus(taskId, newStatus)
+      
+      if (error) {
+        console.error("Error updating task status:", error)
+        return
+      }
+      
+      if (data && data.length > 0) {
+        // Update the task in the state
+        setTasks(prevTasks => 
+          prevTasks.map(task => 
+            task.id === taskId ? { ...task, status: newStatus } : task
+          )
+        )
+        console.log(`Task ${taskId} status updated to ${newStatus}`)
+      }
+    } catch (err) {
+      console.error("Error updating task status:", err)
+    }
+  }
+
   return (
     <>
       <Header title={`${project.name} - Tasks`} />
@@ -183,10 +217,16 @@ function ProjectTasksContent({ params }: ProjectTasksPageProps) {
                 ))}
               </SelectContent>
             </Select>
-            <Button className="bg-primary-blue hover:bg-primary-blue/90">
-              <Plus className="mr-2 h-4 w-4" />
-              New Task
-            </Button>
+            <NewTaskDialog 
+              projectId={id} 
+              users={users}
+              onTaskCreated={handleTaskCreated}
+            >
+              <Button className="bg-primary-blue hover:bg-primary-blue/90">
+                <Plus className="mr-2 h-4 w-4" />
+                New Task
+              </Button>
+            </NewTaskDialog>
           </div>
         </div>
 
@@ -223,14 +263,12 @@ function ProjectTasksContent({ params }: ProjectTasksPageProps) {
                     const assignee = getUser(task.assignee)
 
                     return (
-                      <Card
-                        key={task.id}
-                        className="cursor-pointer hover:shadow-md"
-                        onClick={() => handleTaskClick(task.id)}
-                      >
+                      <Card key={task.id} className="hover:shadow-md">
                         <CardContent className="p-4">
-                          <h4 className="mb-1 font-medium">{task.title}</h4>
-                          <p className="mb-3 line-clamp-2 text-xs text-muted-foreground">{task.description}</p>
+                          <div className="cursor-pointer" onClick={() => handleTaskClick(task.id)}>
+                            <h4 className="mb-1 font-medium">{task.title}</h4>
+                            <p className="mb-3 line-clamp-2 text-xs text-muted-foreground">{task.description}</p>
+                          </div>
                           <div className="flex items-center justify-between">
                             <div className="flex items-center gap-1">
                               <Clock className="h-3 w-3 text-muted-foreground" />
@@ -241,25 +279,43 @@ function ProjectTasksContent({ params }: ProjectTasksPageProps) {
                                 </Badge>
                               )}
                             </div>
-                            {assignee && (
-                              <Avatar className="h-6 w-6">
-                                <AvatarImage src={assignee.avatar || "/placeholder.svg"} alt={assignee.name} />
-                                <AvatarFallback className="text-xs">
-                                  {assignee.name
-                                    .split(" ")
-                                    .map((n) => n[0])
-                                    .join("")}
-                                </AvatarFallback>
-                              </Avatar>
-                            )}
+                            <div className="flex items-center gap-2">
+                              {assignee && (
+                                <Avatar className="h-6 w-6">
+                                  <AvatarImage src={assignee.avatar || "/placeholder.svg"} alt={assignee.name} />
+                                  <AvatarFallback className="text-xs">
+                                    {assignee.name
+                                      .split(" ")
+                                      .map((n) => n[0])
+                                      .join("")}
+                                  </AvatarFallback>
+                                </Avatar>
+                              )}
+                              <Select
+                                defaultValue={task.status}
+                                onValueChange={(value) => handleTaskStatusUpdate(task.id, value)}
+                              >
+                                <SelectTrigger className="h-7 w-[110px] text-xs border-dashed">
+                                  <SelectValue placeholder="Change status" />
+                                </SelectTrigger>
+                                <SelectContent>
+                                  {taskStatuses.map((status) => (
+                                    <SelectItem key={status.id} value={status.name}>
+                                      {status.name}
+                                    </SelectItem>
+                                  ))}
+                                </SelectContent>
+                              </Select>
+                            </div>
                           </div>
                         </CardContent>
                       </Card>
                     )
                   })}
                   {(tasksByStatus[status.name]?.length || 0) === 0 && (
-                    <div className="rounded-lg border border-dashed p-4 text-center text-sm text-muted-foreground">
-                      No tasks
+                    <div className="rounded-lg border border-dashed p-4 text-left text-sm text-muted-foreground">
+                      <p className="mb-2">No tasks</p>
+                      
                     </div>
                   )}
                 </div>
@@ -280,8 +336,7 @@ function ProjectTasksContent({ params }: ProjectTasksPageProps) {
                     return (
                       <div
                         key={task.id}
-                        className="flex items-start justify-between border-b pb-4 cursor-pointer hover:bg-muted/50"
-                        onClick={() => handleTaskClick(task.id)}
+                        className="flex items-start justify-between border-b pb-4 hover:bg-muted/50"
                       >
                         <div className="flex items-start gap-3">
                           {task.status === "Completed" ? (
@@ -289,7 +344,7 @@ function ProjectTasksContent({ params }: ProjectTasksPageProps) {
                           ) : (
                             <Clock className="mt-0.5 h-5 w-5 text-primary-blue" />
                           )}
-                          <div>
+                          <div className="cursor-pointer" onClick={() => handleTaskClick(task.id)}>
                             <h4 className="font-medium">{task.title}</h4>
                             <p className="line-clamp-1 text-sm text-muted-foreground">{task.description}</p>
                             <div className="mt-1 flex flex-wrap items-center gap-2">
@@ -314,6 +369,21 @@ function ProjectTasksContent({ params }: ProjectTasksPageProps) {
                           >
                             {task.priority}
                           </Badge>
+                          <Select
+                            defaultValue={task.status}
+                            onValueChange={(value) => handleTaskStatusUpdate(task.id, value)}
+                          >
+                            <SelectTrigger className="h-7 w-[110px] text-xs border-dashed">
+                              <SelectValue placeholder="Change status" />
+                            </SelectTrigger>
+                            <SelectContent>
+                              {taskStatuses.map((status) => (
+                                <SelectItem key={status.id} value={status.name}>
+                                  {status.name}
+                                </SelectItem>
+                              ))}
+                            </SelectContent>
+                          </Select>
                           {assignee && (
                             <Avatar className="h-6 w-6">
                               <AvatarImage src={assignee.avatar || "/placeholder.svg"} alt={assignee.name} />
@@ -330,7 +400,19 @@ function ProjectTasksContent({ params }: ProjectTasksPageProps) {
                     )
                   })
                 ) : (
-                  <div className="py-4 text-center text-muted-foreground">No tasks found</div>
+                  <div className="py-4 text-center text-muted-foreground">
+                    <p className="mb-3">No tasks found</p>
+                    <NewTaskDialog 
+                      projectId={id} 
+                      users={users}
+                      onTaskCreated={handleTaskCreated}
+                    >
+                      <Button variant="outline" size="sm">
+                        <Plus className="mr-1 h-3 w-3" />
+                        Add Task
+                      </Button>
+                    </NewTaskDialog>
+                  </div>
                 )}
               </div>
             </CardContent>

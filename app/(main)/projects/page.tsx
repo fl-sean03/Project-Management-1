@@ -10,6 +10,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Plus, Search } from "lucide-react"
 import { projectService, Project } from "@/lib/supabase-service"
 import { NewProjectDialog } from "@/components/projects/new-project-dialog"
+import { useAuth } from "@/lib/auth-context"
 
 export default function ProjectsPage() {
   const [projects, setProjects] = useState<Project[]>([])
@@ -20,12 +21,28 @@ export default function ProjectsPage() {
   const [sortBy, setSortBy] = useState("newest")
   const [refreshTrigger, setRefreshTrigger] = useState(0)
   const router = useRouter()
+  const { user, loading: authLoading } = useAuth()
+
+  useEffect(() => {
+    if (!authLoading && !user) {
+      console.log("User not authenticated, redirecting to login...")
+      router.push('/login')
+    }
+  }, [user, authLoading, router])
 
   const fetchProjects = async () => {
     console.log("Starting fetchProjects()...");
     setLoading(true)
     setError(null)
     try {
+      if (!user) {
+        console.log("No authenticated user, not fetching projects")
+        setProjects([])
+        setLoading(false)
+        return
+      }
+
+      console.log("Fetching projects for user:", user.id)
       const { data, error } = await projectService.searchProjects(searchQuery, statusFilter, sortBy)
       
       console.log("Raw data returned from searchProjects:", data);
@@ -36,10 +53,8 @@ export default function ProjectsPage() {
         return
       }
       
-      // Make sure we have an array even if data is null
       const projects = data || []
       
-      // Ensure each project has the required fields
       const sanitizedProjects = projects.map(project => ({
         ...project,
         team: project.team || [],
@@ -51,7 +66,6 @@ export default function ProjectsPage() {
       
       console.log("Sanitized projects to set state:", sanitizedProjects);
       
-      // Set the projects state
       setProjects(sanitizedProjects)
       console.log("Projects state updated successfully");
     } catch (error) {
@@ -63,20 +77,20 @@ export default function ProjectsPage() {
   }
 
   useEffect(() => {
-    console.log("useEffect triggered with refreshTrigger:", refreshTrigger);
-    fetchProjects();
-  }, [searchQuery, statusFilter, sortBy, refreshTrigger])
+    if (user) {
+      console.log("useEffect triggered with refreshTrigger:", refreshTrigger);
+      fetchProjects();
+    }
+  }, [searchQuery, statusFilter, sortBy, refreshTrigger, user])
 
   const handleProjectClick = (projectId: string) => {
     router.push(`/project/${projectId}`)
   }
 
   const handleProjectCreated = (newProject: Project) => {
-    // Log the incoming project data
     console.log("ProjectsPage received new project:", newProject);
     console.log("Current projects state before update:", projects);
     
-    // Immediately add the new project to the state
     const sanitizedNewProject = {
       ...newProject,
       team: newProject.team || [],
@@ -88,14 +102,10 @@ export default function ProjectsPage() {
     
     console.log("Sanitized project to add to state:", sanitizedNewProject);
     
-    // Temporarily disable loading to prevent loading indicator
     setLoading(false);
     
-    // Force update by directly modifying state instead of using the callback pattern
-    // This ensures React detects the state change more reliably
     const updatedProjects = [...projects];
     
-    // Check if the project is already in the list to avoid duplicates
     const existingIndex = updatedProjects.findIndex(p => p.id === newProject.id);
     
     if (existingIndex >= 0) {
@@ -103,8 +113,6 @@ export default function ProjectsPage() {
       updatedProjects[existingIndex] = sanitizedNewProject;
     } else {
       console.log("Adding new project to state...");
-      // If sorting by newest first, add to beginning, otherwise add at end 
-      // and we'll refresh after to ensure proper sorting
       if (sortBy === 'newest') {
         updatedProjects.unshift(sanitizedNewProject);
       } else {
@@ -116,12 +124,10 @@ export default function ProjectsPage() {
     setProjects(updatedProjects);
     console.log("Projects state after direct update:", updatedProjects);
     
-    // Also refresh to ensure server data is in sync
     setTimeout(() => {
       console.log("Refreshing projects from server...");
-      // Increment the refresh trigger to force a re-fetch
       setRefreshTrigger(prev => prev + 1);
-    }, 500); // Small delay to ensure database consistency
+    }, 500);
   }
 
   return (

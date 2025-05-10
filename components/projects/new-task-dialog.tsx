@@ -24,29 +24,33 @@ import {
 import { Calendar } from "@/components/ui/calendar"
 import { CalendarIcon } from "lucide-react"
 import { format } from "date-fns"
-import { projectService, Project } from "@/lib/supabase-service"
+import { taskService, Task, User } from "@/lib/supabase-service"
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover"
 import { cn } from "@/lib/utils"
-import { PostgrestError } from '@supabase/supabase-js'
 
-type NewProjectDialogProps = {
+type NewTaskDialogProps = {
   children: React.ReactNode;
-  onProjectCreated?: (project: Project) => void;
+  projectId: string;
+  users: User[];
+  onTaskCreated?: (task: Task) => void;
 }
 
-export function NewProjectDialog({ children, onProjectCreated }: NewProjectDialogProps) {
+export function NewTaskDialog({ children, projectId, users, onTaskCreated }: NewTaskDialogProps) {
   const [open, setOpen] = useState(false)
   const [loading, setLoading] = useState(false)
   const [formError, setFormError] = useState<string | null>(null)
   const [date, setDate] = useState<Date>()
   
+  // Default values for the form
   const [formData, setFormData] = useState({
-    name: "",
+    title: "",
     description: "",
     priority: "Medium",
-    status: "Not Started",
+    status: "To Do",
     due_date: "",
-    category: "General"
+    assignee_id: "unassigned",
+    project_id: projectId,
+    estimated_hours: 0
   })
   
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
@@ -61,6 +65,14 @@ export function NewProjectDialog({ children, onProjectCreated }: NewProjectDialo
     setFormData(prev => ({
       ...prev,
       [name]: value
+    }))
+  }
+  
+  const handleNumberChange = (name: string, value: string) => {
+    const numValue = parseFloat(value) || 0
+    setFormData(prev => ({
+      ...prev,
+      [name]: numValue
     }))
   }
   
@@ -89,104 +101,55 @@ export function NewProjectDialog({ children, onProjectCreated }: NewProjectDialo
     
     try {
       // Validate form
-      if (!formData.name.trim()) {
-        setFormError("Project name is required")
+      if (!formData.title.trim()) {
+        setFormError("Task title is required")
         setLoading(false)
         return
       }
       
       // Log what we're sending to the API
-      console.log("Creating project with data:", formData)
+      console.log("Creating task with data:", formData)
       
-      // Create project in Supabase
-      const { data, error } = await projectService.createProject(formData)
+      // Create a copy of the form data and handle the unassigned case
+      const taskToCreate = {
+        ...formData,
+        // Convert "unassigned" to undefined for the database
+        assignee_id: formData.assignee_id === "unassigned" ? undefined : formData.assignee_id
+      }
+      
+      // Create task in Supabase
+      const { data, error } = await taskService.createTask(taskToCreate)
       
       if (error) {
-        console.error("Error creating project:", error)
-        // Handle PostgrestError correctly
-        const errorMessage = (error as PostgrestError)?.message || 'Unknown error'
-        
-        // Check if the error message indicates an auth issue
-        if (errorMessage.includes('auth') || errorMessage.includes('login') || errorMessage.includes('Authentication')) {
-          setFormError("Authentication error: You need to be logged in to create projects. Please sign in and try again.")
-        } else {
-          setFormError(`Failed to create project: ${errorMessage}`)
-        }
+        console.error("Error creating task:", error)
+        setFormError(`Failed to create task: ${error.message}`)
         return
       }
       
-      // Log the created project
-      console.log("Project created successfully:", data)
+      // Log the created task
+      console.log("Task created successfully:", data)
       
       // Close dialog and reset form
       setOpen(false)
       setFormData({
-        name: "",
+        title: "",
         description: "",
         priority: "Medium",
-        status: "Not Started",
+        status: "To Do",
         due_date: "",
-        category: "General"
+        assignee_id: "unassigned",
+        project_id: projectId,
+        estimated_hours: 0
       })
       setDate(undefined)
       
-      // Call onProjectCreated callback if provided
-      if (onProjectCreated && data) {
-        // Log the raw data returned from Supabase for debugging
-        console.log("Raw data returned from insert:", data);
-        
-        // IMPORTANT FIX: Supabase returns the inserted records in the data property
-        // The shape of the returned data is different than expected
-        // We need to safely access this data with proper type casting
-        let projectData: Partial<Project> = {};
-        
-        // Handle both formats: array of projects or single project object
-        if (Array.isArray(data) && data.length > 0) {
-          // When .select() is used with insert(), Supabase returns an array
-          projectData = data[0] as Partial<Project>;
-        } else if (typeof data === 'object' && data !== null) {
-          // In some cases it might return a direct object
-          projectData = data as Partial<Project>;
-        } else {
-          console.error("Unexpected data format from Supabase:", data);
-          return; // If we can't process the data, don't continue
-        }
-        
-        // Log the extracted project data
-        console.log("Extracted project data:", projectData);
-        
-        // Make sure all required fields are present before passing to the callback
-        const completeProject: Project = {
-          id: projectData.id || '',
-          name: projectData.name || '',
-          description: projectData.description || '',
-          team: projectData.team || [],
-          progress: projectData.progress || 0,
-          priority: projectData.priority || 'Medium',
-          status: projectData.status || 'Not Started',
-          due_date: projectData.due_date || '',
-          created_at: projectData.created_at || new Date().toISOString(),
-          category: projectData.category || 'General',
-          // Add required fields that might be missing with default values
-          tasks: 0,
-          completed_tasks: 0,
-          start_date: '',
-          budget: 0,
-          client: '',
-          owner_id: projectData.owner_id || '',
-          objectives: [],
-          milestones: []
-        };
-        
-        // Log the complete project being passed to the callback
-        console.log("Complete project passed to callback:", completeProject);
-        
-        // Pass the complete project to the callback
-        onProjectCreated(completeProject);
+      // Call onTaskCreated callback if provided
+      if (onTaskCreated && data && data.length > 0) {
+        onTaskCreated(data[0] as Task)
       }
       
     } catch (error: any) {
-      console.error("Error creating project:", error)
+      console.error("Error creating task:", error)
       setFormError(`An unexpected error occurred: ${error?.message || 'Unknown error'}`)
     } finally {
       setLoading(false)
@@ -198,12 +161,14 @@ export function NewProjectDialog({ children, onProjectCreated }: NewProjectDialo
       // When dialog is closed, reset the form
       if (!newOpen) {
         setFormData({
-          name: "",
+          title: "",
           description: "",
           priority: "Medium",
-          status: "Not Started",
+          status: "To Do",
           due_date: "",
-          category: "General"
+          assignee_id: "unassigned",
+          project_id: projectId,
+          estimated_hours: 0
         });
         setDate(undefined);
         setFormError(null);
@@ -216,19 +181,19 @@ export function NewProjectDialog({ children, onProjectCreated }: NewProjectDialo
       <DialogContent className="sm:max-w-[525px]">
         <form onSubmit={handleSubmit}>
           <DialogHeader>
-            <DialogTitle>Create New Project</DialogTitle>
+            <DialogTitle>Create New Task</DialogTitle>
             <DialogDescription>
-              Add a new project to your workspace. Fill out the required fields and click Create when you're done.
+              Add a new task to this project. Fill out the required fields and click Create when you're done.
             </DialogDescription>
           </DialogHeader>
           <div className="grid gap-4 py-4">
             <div className="grid items-center gap-2">
-              <Label htmlFor="name">Project Name*</Label>
+              <Label htmlFor="title">Task Title*</Label>
               <Input
-                id="name"
-                name="name"
-                placeholder="Enter project name"
-                value={formData.name}
+                id="title"
+                name="title"
+                placeholder="Enter task title"
+                value={formData.title}
                 onChange={handleInputChange}
               />
             </div>
@@ -237,11 +202,45 @@ export function NewProjectDialog({ children, onProjectCreated }: NewProjectDialo
               <Textarea
                 id="description"
                 name="description"
-                placeholder="Enter project description"
+                placeholder="Enter task description"
                 value={formData.description}
                 onChange={handleInputChange}
                 className="min-h-[80px]"
               />
+            </div>
+            <div className="grid grid-cols-2 gap-4">
+              <div className="grid items-center gap-2">
+                <Label htmlFor="assignee_id">Assignee</Label>
+                <Select
+                  value={formData.assignee_id}
+                  onValueChange={(value) => handleSelectChange("assignee_id", value)}
+                >
+                  <SelectTrigger id="assignee_id">
+                    <SelectValue placeholder="Select assignee" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="unassigned">Unassigned</SelectItem>
+                    {users.map((user) => (
+                      <SelectItem key={user.id} value={user.id}>
+                        {user.name}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="grid items-center gap-2">
+                <Label htmlFor="estimated_hours">Estimated Hours</Label>
+                <Input
+                  id="estimated_hours"
+                  name="estimated_hours"
+                  type="number"
+                  min="0"
+                  step="0.5"
+                  placeholder="0"
+                  value={formData.estimated_hours}
+                  onChange={(e) => handleNumberChange("estimated_hours", e.target.value)}
+                />
+              </div>
             </div>
             <div className="grid grid-cols-2 gap-4">
               <div className="grid items-center gap-2">
@@ -270,9 +269,9 @@ export function NewProjectDialog({ children, onProjectCreated }: NewProjectDialo
                     <SelectValue placeholder="Select status" />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="Not Started">Not Started</SelectItem>
-                    <SelectItem value="Planning">Planning</SelectItem>
+                    <SelectItem value="To Do">To Do</SelectItem>
                     <SelectItem value="In Progress">In Progress</SelectItem>
+                    <SelectItem value="Review">Review</SelectItem>
                     <SelectItem value="Completed">Completed</SelectItem>
                   </SelectContent>
                 </Select>
@@ -303,24 +302,6 @@ export function NewProjectDialog({ children, onProjectCreated }: NewProjectDialo
                 </PopoverContent>
               </Popover>
             </div>
-            <div className="grid items-center gap-2">
-              <Label htmlFor="category">Category</Label>
-              <Select
-                value={formData.category}
-                onValueChange={(value) => handleSelectChange("category", value)}
-              >
-                <SelectTrigger id="category">
-                  <SelectValue placeholder="Select category" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="General">General</SelectItem>
-                  <SelectItem value="Development">Development</SelectItem>
-                  <SelectItem value="Design">Design</SelectItem>
-                  <SelectItem value="Marketing">Marketing</SelectItem>
-                  <SelectItem value="Research">Research</SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
             {formError && (
               <div className="text-sm text-destructive-red">{formError}</div>
             )}
@@ -330,7 +311,7 @@ export function NewProjectDialog({ children, onProjectCreated }: NewProjectDialo
               Cancel
             </Button>
             <Button type="submit" className="bg-primary-blue hover:bg-primary-blue/90" disabled={loading}>
-              {loading ? "Creating..." : "Create Project"}
+              {loading ? "Creating..." : "Create Task"}
             </Button>
           </DialogFooter>
         </form>
