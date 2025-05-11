@@ -1,11 +1,11 @@
-import type React from "react"
+import type { Metadata } from "next"
 import { Inter, Space_Grotesk, JetBrains_Mono } from "next/font/google"
 import "./globals.css"
 import { ThemeProvider } from "@/components/theme-provider"
 import { AuthProvider } from "@/hooks/auth"
 import { TaskDetailDrawer } from "@/components/tasks/task-detail-drawer"
-import { TeamMemberDetailDrawer } from "@/components/team/team-member-detail-drawer"
 import { ActivityDetailDrawer } from "@/components/activity/activity-detail-drawer"
+import { Toaster } from "@/components/ui/toaster"
 
 const inter = Inter({
   subsets: ["latin"],
@@ -42,8 +42,9 @@ export default function RootLayout({
             {children}
             {/* Add global drawer instances so they're available throughout the app */}
             <TaskDetailDrawer projectId="" />
-            <TeamMemberDetailDrawer projectId="" />
+            {/* TeamMemberDetailDrawer is now added in project-specific pages with the correct projectId */}
             <ActivityDetailDrawer projectId="" />
+            <Toaster />
           </AuthProvider>
         </ThemeProvider>
       </body>

@@ -31,8 +31,12 @@ export type User = {
   team: string;
   location: string;
   phone: string;
-  joinedDate: string;
+  joined_date?: string;
   bio: string;
+  // New fields for enhanced user information
+  last_active?: string;
+  skills?: string[];
+  projectRole?: string; // For team members with role in project
 };
 
 // Task type definition

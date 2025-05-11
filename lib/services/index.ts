@@ -5,4 +5,5 @@ export * from './task-service';
 export * from './user-service';
 export * from './comment-service';
 export * from './file-service';
-export * from './activity-service'; 
+export * from './activity-service';
+export * from './email-service'; 

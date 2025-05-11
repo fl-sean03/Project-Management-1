@@ -19,11 +19,34 @@ export const userService = {
    */
   async getUserById(id: string) {
     const supabase = getSupabaseClient();
-    return await supabase
+    const { data, error } = await supabase
       .from('users')
-      .select('*')
+      .select(`
+        id, 
+        name,
+        email,
+        avatar,
+        role,
+        department,
+        team,
+        location,
+        phone,
+        bio,
+        skills,
+        joined_date,
+        last_active
+      `)
       .eq('id', id)
       .single();
+    
+    if (data && !error) {
+      await supabase
+        .from('users')
+        .update({ last_active: new Date().toISOString() })
+        .eq('id', id);
+    }
+    
+    return { data, error };
   },
   
   /**
@@ -113,7 +136,7 @@ export const userService = {
               team: '',
               location: '',
               phone: '',
-              joinedDate: authData.user.created_at || '',
+              joined_date: authData.user.created_at || '',
               bio: ''
             } as User,
             error: null

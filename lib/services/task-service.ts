@@ -68,6 +68,38 @@ export const taskService = {
   },
 
   /**
+   * Get all tasks assigned to a specific user
+   */
+  async getTasksByAssignee(assigneeId: string) {
+    const supabase = getSupabaseClient();
+    const response = await supabase
+      .from('tasks')
+      .select('*')
+      .eq('assignee_id', assigneeId)
+      .order('due_date', { ascending: true });
+    
+    // Map DB column names to client-side property names
+    if (response.data) {
+      response.data = response.data.map(task => ({
+        id: task.id,
+        title: task.title,
+        description: task.description,
+        status: task.status,
+        priority: task.priority,
+        dueDate: task.due_date,
+        createdAt: task.created_at,
+        estimatedHours: task.estimated_hours,
+        project: task.project_id,
+        assignee: task.assignee_id,
+        tags: task.tags || [],
+        comments: 0 // This would be replaced with an actual count in a production app
+      }));
+    }
+    
+    return response;
+  },
+
+  /**
    * Create a new task
    */
   async createTask(taskData: {

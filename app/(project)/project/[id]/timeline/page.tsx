@@ -1,6 +1,7 @@
 "use client"
 
 import { useState, useEffect } from "react"
+import { use } from 'react'
 import { notFound } from "next/navigation"
 import { Header } from "@/components/layout/header"
 import { Button } from "@/components/ui/button"
@@ -13,13 +14,13 @@ import { projectService, taskService, userService } from "@/lib/services"
 import { Task, User, Project } from "@/lib/types"
 
 interface TimelinePageProps {
-  params: {
+  params: Promise<{
     id: string
-  }
+  }>
 }
 
 export default function TimelinePage({ params }: TimelinePageProps) {
-  const id = params.id
+  const { id } = use(params)
   const [timeframe, setTimeframe] = useState("month")
   const [currentDate, setCurrentDate] = useState(new Date())
   

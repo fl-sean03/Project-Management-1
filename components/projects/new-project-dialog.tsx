@@ -99,28 +99,52 @@ export function NewProjectDialog({ children, onProjectCreated }: NewProjectDialo
       // Log what we're sending to the API
       console.log("Creating project with data:", formData)
       
-      // Create project in Supabase
-      const { data, error } = await projectService.createProject(formData)
+      // Create project with improved error handling
+      const { data, error } = await projectService.createProject(formData);
       
       if (error) {
-        console.error("Error creating project:", error)
-        // Handle PostgrestError correctly
-        const errorMessage = (error as PostgrestError)?.message || 'Unknown error'
+        console.error("Error creating project:", error);
         
-        // Check if the error message indicates an auth issue
-        if (errorMessage.includes('auth') || errorMessage.includes('login') || errorMessage.includes('Authentication')) {
-          setFormError("Authentication error: You need to be logged in to create projects. Please sign in and try again.")
-        } else {
-          setFormError(`Failed to create project: ${errorMessage}`)
+        // Special handling for duplicate project member error
+        const errorObj = error as any;
+        if (typeof errorObj === 'object' && errorObj !== null && 
+            'code' in errorObj && errorObj.code === '23505' && 
+            'message' in errorObj && typeof errorObj.message === 'string' &&
+            errorObj.message.includes('project_members_project_id_user_id_key')) {
+          setFormError("Project may have been created but there was an issue adding you as a member. Try refreshing your projects page.");
+        } 
+        // Handle authentication errors
+        else if (typeof errorObj === 'object' && errorObj !== null && 
+                'message' in errorObj && typeof errorObj.message === 'string' &&
+                (errorObj.message.includes('auth') || 
+                 errorObj.message.includes('login') || 
+                 errorObj.message.includes('Authentication'))) {
+          setFormError("Authentication error: You need to be logged in to create projects. Please sign in and try again.");
+        } 
+        // Generic error handling
+        else {
+          const errorMessage = typeof errorObj === 'object' && errorObj !== null && 'message' in errorObj ? 
+                              String(errorObj.message) : 'Unknown error';
+          setFormError(`Failed to create project: ${errorMessage}`);
         }
-        return
+        
+        setLoading(false);
+        return;
+      }
+      
+      // Check if we actually got back project data
+      if (!data || (Array.isArray(data) && data.length === 0)) {
+        console.error("No project data returned:", data);
+        setFormError("Project creation succeeded but no data was returned. Try refreshing your projects.");
+        setLoading(false);
+        return;
       }
       
       // Log the created project
-      console.log("Project created successfully:", data)
+      console.log("Project created successfully:", data);
       
       // Close dialog and reset form
-      setOpen(false)
+      setOpen(false);
       setFormData({
         name: "",
         description: "",
@@ -128,35 +152,21 @@ export function NewProjectDialog({ children, onProjectCreated }: NewProjectDialo
         status: "Not Started",
         due_date: "",
         category: "General"
-      })
-      setDate(undefined)
+      });
+      setDate(undefined);
       
       // Call onProjectCreated callback if provided
       if (onProjectCreated && data) {
-        // Log the raw data returned from Supabase for debugging
-        console.log("Raw data returned from insert:", data);
-        
-        // IMPORTANT FIX: Supabase returns the inserted records in the data property
-        // The shape of the returned data is different than expected
-        // We need to safely access this data with proper type casting
+        // Extract project data properly
         let projectData: Partial<Project> = {};
         
-        // Handle both formats: array of projects or single project object
         if (Array.isArray(data) && data.length > 0) {
-          // When .select() is used with insert(), Supabase returns an array
           projectData = data[0] as Partial<Project>;
-        } else if (typeof data === 'object' && data !== null) {
-          // In some cases it might return a direct object
+        } else if (data && typeof data === 'object') {
           projectData = data as Partial<Project>;
-        } else {
-          console.error("Unexpected data format from Supabase:", data);
-          return; // If we can't process the data, don't continue
         }
         
-        // Log the extracted project data
-        console.log("Extracted project data:", projectData);
-        
-        // Make sure all required fields are present before passing to the callback
+        // Create a complete project object with defaults for any missing fields
         const completeProject: Project = {
           id: projectData.id || '',
           name: projectData.name || '',
@@ -168,7 +178,6 @@ export function NewProjectDialog({ children, onProjectCreated }: NewProjectDialo
           due_date: projectData.due_date || '',
           created_at: projectData.created_at || new Date().toISOString(),
           category: projectData.category || 'General',
-          // Add required fields that might be missing with default values
           tasks: 0,
           completed_tasks: 0,
           start_date: '',
@@ -179,18 +188,15 @@ export function NewProjectDialog({ children, onProjectCreated }: NewProjectDialo
           milestones: []
         };
         
-        // Log the complete project being passed to the callback
-        console.log("Complete project passed to callback:", completeProject);
-        
         // Pass the complete project to the callback
         onProjectCreated(completeProject);
       }
-      
     } catch (error: any) {
-      console.error("Error creating project:", error)
-      setFormError(`An unexpected error occurred: ${error?.message || 'Unknown error'}`)
+      console.error("Unhandled error creating project:", error);
+      setFormError(`An unexpected error occurred: ${error?.message || 'Unknown error'}`);
+      setLoading(false);
     } finally {
-      setLoading(false)
+      setLoading(false);
     }
   }
   

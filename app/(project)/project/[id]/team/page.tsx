@@ -2,6 +2,7 @@
 
 import { notFound } from "next/navigation"
 import { useState, useEffect } from "react"
+import { use } from 'react'
 import { Header } from "@/components/layout/header"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
@@ -12,16 +13,17 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { projectService, userService, activityService } from "@/lib/services"
 import { Project, User, Activity } from "@/lib/types"
 import { TeamInviteDialog } from "@/components/projects/team-invite-dialog"
+import { TeamMemberDetailDrawer } from "@/components/team/team-member-detail-drawer"
 
 interface TeamPageProps {
-  params: {
+  params: Promise<{
     id: string
-  }
+  }>
 }
 
 export default function TeamPage({ params }: TeamPageProps) {
-  // For client components in route handlers, we can access params directly
-  const id = params.id
+  // Unwrap params Promise with React.use()
+  const { id } = use(params)
   const [project, setProject] = useState<Project | null>(null)
   const [teamMembers, setTeamMembers] = useState<User[]>([])
   const [teamActivities, setTeamActivities] = useState<Activity[]>([])
@@ -67,9 +69,22 @@ export default function TeamPage({ params }: TeamPageProps) {
           const teamPromises = userIds.map(userId => userService.getUserById(userId));
           const teamResults = await Promise.all(teamPromises);
           
+          // Create a map of project member roles by user_id
+          const memberRolesMap: Record<string, string> = {};
+          projectMembersData.forEach(member => {
+            memberRolesMap[member.user_id] = member.role;
+          });
+          
           const validTeamMembers = teamResults
             .filter(result => !result.error && result.data)
-            .map(result => result.data);
+            .map(result => {
+              // Enrich user data with their project role
+              const userData = result.data as User;
+              return {
+                ...userData,
+                projectRole: memberRolesMap[userData.id] || 'member'
+              } as User;
+            });
           
           setTeamMembers(validTeamMembers);
           
@@ -149,6 +164,26 @@ export default function TeamPage({ params }: TeamPageProps) {
     window.dispatchEvent(new CustomEvent("activitychange", { detail: { activityId } }))
   }
 
+  // Add this helper function near the formatDate function
+  const getLastActive = (lastActiveDate?: string): string => {
+    if (!lastActiveDate) return "Unknown";
+
+    const lastActive = new Date(lastActiveDate);
+    const now = new Date();
+    const diffMinutes = Math.floor((now.getTime() - lastActive.getTime()) / (1000 * 60));
+    
+    if (diffMinutes < 1) return "Just now";
+    if (diffMinutes < 60) return `${diffMinutes} minutes ago`;
+    
+    const diffHours = Math.floor(diffMinutes / 60);
+    if (diffHours < 24) return `${diffHours} hour${diffHours > 1 ? 's' : ''} ago`;
+    
+    const diffDays = Math.floor(diffHours / 24);
+    if (diffDays < 7) return `${diffDays} day${diffDays > 1 ? 's' : ''} ago`;
+    
+    return formatDate(lastActiveDate);
+  };
+
   if (loading) {
     return (
       <>
@@ -215,47 +250,58 @@ export default function TeamPage({ params }: TeamPageProps) {
                     className="overflow-hidden cursor-pointer hover:shadow-md transition-shadow"
                     onClick={() => handleTeamMemberClick(member.id)}
                   >
-                    <CardHeader className="bg-muted/30 pb-2">
-                      <div className="flex items-center gap-4">
-                        <Avatar className="h-12 w-12">
+                    <CardHeader className="pb-2 pt-4 px-4">
+                      <div className="flex items-center gap-3">
+                        <Avatar className="h-16 w-16 border-2 border-background">
                           <AvatarImage src={member.avatar || "/placeholder.svg"} alt={member.name} />
-                          <AvatarFallback>{member.name.split(" ").map((n) => n[0]).join("")}</AvatarFallback>
+                          <AvatarFallback className="text-lg font-semibold">
+                            {member.name.split(" ").map((n) => n[0]).join("")}
+                          </AvatarFallback>
                         </Avatar>
                         <div>
-                          <h3 className="font-medium">{member.name}</h3>
-                          <p className="text-sm text-muted-foreground">{member.role}</p>
+                          <h3 className="font-semibold text-base">{member.name}</h3>
+                          <p className="text-sm text-muted-foreground">{member.projectRole}</p>
                         </div>
                       </div>
                     </CardHeader>
-                    <CardContent className="pt-2">
-                      <div className="space-y-2">
+                    <CardContent className="px-4 pb-4 pt-0 space-y-3">
+                      <div className="flex items-center gap-2 text-sm">
+                        <Mail className="h-4 w-4 text-muted-foreground shrink-0" />
+                        <span className="text-muted-foreground truncate">{member.email}</span>
+                      </div>
+                      {member.phone && (
                         <div className="flex items-center gap-2 text-sm">
-                          <Mail className="h-4 w-4 text-muted-foreground" />
-                          <span className="text-muted-foreground">{member.email}</span>
+                          <Phone className="h-4 w-4 text-muted-foreground shrink-0" />
+                          <span className="text-muted-foreground">{member.phone}</span>
                         </div>
-                        {member.phone && (
-                          <div className="flex items-center gap-2 text-sm">
-                            <Phone className="h-4 w-4 text-muted-foreground" />
-                            <span className="text-muted-foreground">{member.phone}</span>
-                          </div>
-                        )}
+                      )}
+                      {member.location && (
+                        <div className="flex items-center gap-2 text-sm">
+                          <MapPin className="h-4 w-4 text-muted-foreground shrink-0" />
+                          <span className="text-muted-foreground">{member.location}</span>
+                        </div>
+                      )}
+                      <div className="flex items-center gap-2 text-sm pt-1">
+                        <Calendar className="h-4 w-4 text-muted-foreground shrink-0" />
+                        <span className="text-xs text-muted-foreground">
+                          Joined {formatDate(member.joined_date || "")}
+                        </span>
+                      </div>
+                      <div className="pt-1 flex flex-wrap gap-1">
                         {member.department && (
-                          <div className="flex items-center gap-2 text-sm">
-                            <Badge className="bg-primary-blue/10 text-primary-blue">{member.department}</Badge>
-                            {member.location && (
-                              <div className="flex items-center gap-1 text-xs text-muted-foreground">
-                                <MapPin className="h-3 w-3" />
-                                <span>{member.location}</span>
-                              </div>
-                            )}
-                          </div>
+                          <Badge variant="outline" className="bg-muted/30">
+                            {member.department}
+                          </Badge>
                         )}
-                        {member.joinedDate && (
-                          <div className="flex items-center gap-2 text-xs text-muted-foreground">
-                            <Calendar className="h-3 w-3" />
-                            <span>Joined {formatDate(member.joinedDate)}</span>
-                          </div>
-                        )}
+                        {member.skills?.map((skill, i) => (
+                          <Badge key={i} variant="outline" className="bg-muted/30">
+                            {skill}
+                          </Badge>
+                        ))}
+                      </div>
+                      <div className="flex justify-between items-center pt-1 text-xs text-muted-foreground">
+                        <span>Last active:</span>
+                        <span>{getLastActive(member.last_active)}</span>
                       </div>
                     </CardContent>
                   </Card>
@@ -321,6 +367,9 @@ export default function TeamPage({ params }: TeamPageProps) {
           </TabsContent>
         </Tabs>
       </div>
+      
+      {/* Add the TeamMemberDetailDrawer with current project ID */}
+      <TeamMemberDetailDrawer projectId={id} />
     </>
   )
 }

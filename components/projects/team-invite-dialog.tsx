@@ -1,6 +1,6 @@
 "use client"
 
-import { useState } from "react"
+import { useState, useEffect } from "react"
 import { 
   Dialog,
   DialogContent,
@@ -14,9 +14,10 @@ import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
-import { projectService, userService } from "@/lib/services"
+import { projectService, userService, emailService } from "@/lib/services"
 import { User } from "@/lib/types"
 import { useToast } from "@/components/ui/use-toast"
+import { useAuth } from "@/hooks/auth"
 
 type TeamInviteDialogProps = {
   children: React.ReactNode;
@@ -32,7 +33,28 @@ export function TeamInviteDialog({ children, projectId, onMemberAdded }: TeamInv
   const [role, setRole] = useState("member")
   const [searchResults, setSearchResults] = useState<User[]>([])
   const [selectedUser, setSelectedUser] = useState<User | null>(null)
+  const [projectName, setProjectName] = useState("")
   const { toast } = useToast()
+  const { user: currentUser } = useAuth()
+
+  // Get project name for invitation email
+  useEffect(() => {
+    if (projectId && open) {
+      const fetchProjectName = async () => {
+        try {
+          const { data, error } = await projectService.getProjectById(projectId)
+          if (error) throw error
+          if (data) {
+            setProjectName(data.name)
+          }
+        } catch (err) {
+          console.error("Error fetching project name:", err)
+        }
+      }
+      
+      fetchProjectName()
+    }
+  }, [projectId, open])
 
   const handleEmailChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const value = e.target.value
@@ -69,38 +91,53 @@ export function TeamInviteDialog({ children, projectId, onMemberAdded }: TeamInv
     try {
       if (!selectedUser) {
         setFormError("Please select a valid user")
+        setLoading(false)
         return
       }
       
-      // Check if user is already a member
-      const { data: existingMembers, error: checkError } = await projectService.getProjectMembers(projectId)
-      
-      if (checkError) {
-        throw new Error("Failed to check existing members")
-      }
-      
-      const isAlreadyMember = existingMembers?.some(member => member.user_id === selectedUser.id)
-      
-      if (isAlreadyMember) {
-        setFormError("This user is already a member of this project")
-        return
-      }
-      
-      // Add user to project
-      const { error } = await projectService.addProjectMember(
+      // The addProjectMember function now checks if the user is already a member
+      // and returns the existing membership if they are
+      const { data, error } = await projectService.addProjectMember(
         projectId, 
         selectedUser.id,
         role
       )
       
       if (error) {
-        throw new Error(`Failed to add team member: ${error.message}`)
+        if (typeof error === 'object' && error !== null && 'code' in error && error.code === "23505") {
+          setFormError("This user is already a member of this project")
+          setLoading(false)
+          return
+        }
+        throw new Error(`Failed to add team member: ${error instanceof Error ? error.message : JSON.stringify(error)}`)
+      }
+      
+      // Check if this was an existing membership
+      const isExistingMember = data && !Array.isArray(data)
+      
+      // Send invitation email - only if this is a new member
+      if (!isExistingMember && currentUser) {
+        try {
+          await emailService.sendTeamInvitation({
+            projectName,
+            projectId,
+            memberName: selectedUser.name,
+            memberEmail: selectedUser.email,
+            inviterName: currentUser.user_metadata?.name || 'A team member',
+            role
+          });
+        } catch (emailError) {
+          console.error("Error sending invitation email:", emailError);
+          // Don't fail the process if email fails, just log it
+        }
       }
       
       // Success
       toast({
-        title: "Team member added",
-        description: `${selectedUser.name} has been added to the project.`,
+        title: isExistingMember ? "Already a team member" : "Team member added",
+        description: isExistingMember 
+          ? `${selectedUser.name} is already part of this project.`
+          : `${selectedUser.name} has been added to the project and invitation email sent.`,
       })
       
       // Reset form
@@ -109,9 +146,17 @@ export function TeamInviteDialog({ children, projectId, onMemberAdded }: TeamInv
       setRole("member")
       setSelectedUser(null)
       
-      // Call callback
-      if (onMemberAdded) {
-        onMemberAdded(selectedUser)
+      // Call callback - only if this is a new member and the callback exists
+      if (!isExistingMember && onMemberAdded) {
+        // Add projectRole to user object
+        const userWithRole = {
+          ...selectedUser,
+          projectRole: role,
+          // Make sure we have consistent field names
+          joined_date: selectedUser.joined_date || new Date().toISOString(),
+          last_active: new Date().toISOString()
+        };
+        onMemberAdded(userWithRole);
       }
       
     } catch (error: any) {

@@ -15,6 +15,7 @@ import { useAuth } from "@/hooks/auth"
 
 export default function ProjectsPage() {
   const [projects, setProjects] = useState<Project[]>([])
+  const [projectMemberRoles, setProjectMemberRoles] = useState<Record<string, string>>({})
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const [searchQuery, setSearchQuery] = useState("")
@@ -30,6 +31,24 @@ export default function ProjectsPage() {
       router.push('/login')
     }
   }, [user, authLoading, router])
+
+  const fetchUserRoleForProject = async (projectId: string) => {
+    try {
+      if (!user?.id) return null;
+      
+      const { data, error } = await projectService.getProjectMemberRole(projectId, user.id);
+      
+      if (error) {
+        console.error('Error fetching project member role:', error);
+        return null;
+      }
+      
+      return data?.role || 'member';
+    } catch (error) {
+      console.error('Error fetching project member role:', error);
+      return null;
+    }
+  };
 
   const fetchProjects = async () => {
     console.log("Starting fetchProjects()...");
@@ -69,6 +88,18 @@ export default function ProjectsPage() {
       
       setProjects(sanitizedProjects)
       console.log("Projects state updated successfully");
+      
+      // Fetch user roles for each project
+      const roles: Record<string, string> = {};
+      
+      for (const project of sanitizedProjects) {
+        const role = await fetchUserRoleForProject(project.id);
+        if (role) {
+          roles[project.id] = role;
+        }
+      }
+      
+      setProjectMemberRoles(roles);
     } catch (error) {
       console.error('Error fetching projects:', error)
       setError('An unexpected error occurred. Please try again later.')
@@ -208,6 +239,7 @@ export default function ProjectsPage() {
                   team={project.team}
                   status={project.status}
                   priority={project.priority}
+                  userRole={projectMemberRoles[project.id] || ''}
                 />
               </div>
             ))}

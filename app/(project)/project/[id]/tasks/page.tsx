@@ -14,6 +14,8 @@ import { CheckCircle2, Clock, Plus, Search } from "lucide-react"
 import { projectService, taskService, userService } from "@/lib/services"
 import { Task, User, Project } from "@/lib/types"
 import { NewTaskDialog } from "@/components/projects/new-task-dialog"
+import { TaskDetailDrawer } from "@/components/tasks/task-detail-drawer"
+import { TeamMemberDetailDrawer } from "@/components/team/team-member-detail-drawer"
 
 interface ProjectTasksPageProps {
   params: {
@@ -420,6 +422,9 @@ function ProjectTasksContent({ params }: ProjectTasksPageProps) {
           </Card>
         )}
       </div>
+      
+      {/* Add the TeamMemberDetailDrawer with current project ID */}
+      <TeamMemberDetailDrawer projectId={id} />
     </>
   )
 }

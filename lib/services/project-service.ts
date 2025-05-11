@@ -42,11 +42,32 @@ export const projectService = {
         return { data: [], error: new Error("Authentication required") };
       }
       
-      // Start building the query - only fetch projects owned by user
+      // Get projects the user is a member of
+      const { data: memberProjects, error: memberError } = await supabase
+        .from('project_members')
+        .select('project_id')
+        .eq('user_id', userId);
+        
+      if (memberError) {
+        console.error('Error fetching member projects:', memberError);
+        return { data: [], error: memberError };
+      }
+      
+      // Extract project IDs the user is a member of
+      const memberProjectIds = memberProjects?.map(p => p.project_id) || [];
+      
+      // Build the query to fetch both owned projects and projects the user is a member of
       let query = supabase
         .from('projects')
-        .select('*')
-        .eq('owner_id', userId);
+        .select('*');
+        
+      // If the user is a member of any projects, include them in the query
+      if (memberProjectIds.length > 0) {
+        query = query.or(`owner_id.eq.${userId},id.in.(${memberProjectIds.join(',')})`);
+      } else {
+        // If not a member of any projects, just show owned projects
+        query = query.eq('owner_id', userId);
+      }
       
       // Add search filter if provided
       if (searchQuery) {
@@ -97,10 +118,30 @@ export const projectService = {
    */
   async getProjectMembers(projectId: string) {
     const supabase = getSupabaseClient();
-    return await supabase
+    const response = await supabase
       .from('project_members')
-      .select('user_id, role')
+      .select(`
+        id,
+        user_id,
+        role,
+        created_at,
+        last_active
+      `)
       .eq('project_id', projectId);
+
+    // Update last_active for all project members
+    if (response.data && response.data.length > 0) {
+      const updatePromises = response.data.map(member => {
+        return supabase
+          .from('project_members')
+          .update({ last_active: new Date().toISOString() })
+          .eq('id', member.id);
+      });
+      
+      await Promise.all(updatePromises);
+    }
+    
+    return response;
   },
   
   /**
@@ -108,14 +149,41 @@ export const projectService = {
    */
   async addProjectMember(projectId: string, userId: string, role: string = 'member') {
     const supabase = getSupabaseClient();
-    return await supabase
-      .from('project_members')
-      .insert([{
-        project_id: projectId,
-        user_id: userId,
-        role: role,
-        joined_at: new Date().toISOString()
-      }]);
+    
+    try {
+      // First check if this user is already a member of the project
+      const { data: existingMember, error: checkError } = await supabase
+        .from('project_members')
+        .select('id, role')
+        .eq('project_id', projectId)
+        .eq('user_id', userId)
+        .single();
+      
+      // If there was an error other than 'not found', return the error
+      if (checkError && checkError.code !== 'PGRST116') {
+        console.error('Error checking existing project member:', checkError);
+        return { data: null, error: checkError };
+      }
+      
+      // If the user is already a member, don't try to add them again
+      if (existingMember) {
+        console.log('User is already a member of this project');
+        return { data: existingMember, error: null };
+      }
+      
+      // If not already a member, add them
+      return await supabase
+        .from('project_members')
+        .insert([{
+          project_id: projectId,
+          user_id: userId,
+          role: role,
+          created_at: new Date().toISOString()
+        }]);
+    } catch (err) {
+      console.error('Error adding project member:', err);
+      return { data: null, error: err };
+    }
   },
   
   /**
@@ -145,7 +213,9 @@ export const projectService = {
       // Set the owner_id explicitly
       const now = new Date().toISOString();
       
-      const result = await supabase
+      // Step 1: Create the project
+      console.log("Creating project...");
+      const { data: projectData1, error: projectError } = await supabase
         .from('projects')
         .insert([{
           ...projectDataWithoutTeam,
@@ -156,13 +226,52 @@ export const projectService = {
         }])
         .select();
       
-      if (result.error) {
-        throw result.error;
+      if (projectError) {
+        console.error('Error creating project:', projectError);
+        return { data: null, error: projectError };
       }
       
-      return result;
+      if (!projectData1 || projectData1.length === 0) {
+        return { 
+          data: null, 
+          error: new Error('Project was created but no data was returned') 
+        };
+      }
+      
+      const newProject = projectData1[0];
+      const projectId = newProject.id;
+      
+      // Step 2: Make sure the owner is added as a member
+      // This replaces the database trigger that was causing duplicate key errors
+      console.log(`Adding owner ${userId} to project ${projectId} using direct SQL insertion with conflict handling...`);
+      try {
+        // Use upsert mode with ON CONFLICT DO NOTHING
+        const { error: memberError } = await supabase
+          .from('project_members')
+          .upsert({
+            project_id: projectId,
+            user_id: userId,
+            role: 'owner',
+            created_at: now
+          }, { 
+            onConflict: 'project_id,user_id',  // Specify conflicting columns
+            ignoreDuplicates: true             // Equivalent to DO NOTHING
+          });
+        
+        if (memberError) {
+          console.warn('Error adding owner to project (continuing anyway):', memberError);
+        } else {
+          console.log('Project owner membership added successfully');
+        }
+      } catch (memberError) {
+        // Just log this error, don't fail the entire process since the project was created
+        console.warn('Error adding owner to project (continuing anyway):', memberError);
+      }
+      
+      return { data: projectData1, error: null };
     } catch (err) {
-      throw err;
+      console.error('Unhandled error during project creation:', err);
+      return { data: null, error: err };
     }
   },
   
@@ -235,5 +344,60 @@ export const projectService = {
     } catch (err) {
       throw err;
     }
-  }
+  },
+
+  /**
+   * Get a specific project member's role
+   */
+  async getProjectMemberRole(projectId: string, userId: string) {
+    const supabase = getSupabaseClient();
+    return await supabase
+      .from('project_members')
+      .select('role')
+      .eq('project_id', projectId)
+      .eq('user_id', userId)
+      .single();
+  },
+
+  /**
+   * Ensure user is added as a member of a project (used after project creation)
+   * This is needed to handle race conditions with database triggers
+   */
+  async ensureProjectOwnerMembership(projectId: string, userId: string) {
+    const supabase = getSupabaseClient();
+    
+    try {
+      // First check if the user is already a member
+      const { data, error: checkError } = await supabase
+        .from('project_members')
+        .select('id')
+        .eq('project_id', projectId)
+        .eq('user_id', userId)
+        .maybeSingle();
+      
+      // If there was an error (other than not found), log it
+      if (checkError && checkError.code !== 'PGRST116') {
+        console.error('Error checking project membership:', checkError);
+      }
+      
+      // If the user is already a member, don't do anything
+      if (data) {
+        console.log('User is already a member of project:', projectId);
+        return { success: true };
+      }
+      
+      // Use RPC to ensure the user is added with "ON CONFLICT DO NOTHING"
+      // This works even if a trigger or another process tries to add the same user
+      const result = await supabase.rpc('safely_add_project_member', {
+        p_project_id: projectId,
+        p_user_id: userId,
+        p_member_role: 'owner'
+      });
+      
+      return { success: !result.error, error: result.error };
+    } catch (err) {
+      console.error('Error ensuring project membership:', err);
+      return { success: false, error: err };
+    }
+  },
 }; 

@@ -17,9 +17,10 @@ interface ProjectCardProps {
   team: string[] | null
   status: string
   priority: string
+  userRole?: string
 }
 
-export function ProjectCard({ id, name, description, progress, dueDate, team = [], status, priority }: ProjectCardProps) {
+export function ProjectCard({ id, name, description, progress, dueDate, team = [], status, priority, userRole }: ProjectCardProps) {
   const [teamMembers, setTeamMembers] = useState<User[]>([])
   
   useEffect(() => {
@@ -32,6 +33,7 @@ export function ProjectCard({ id, name, description, progress, dueDate, team = [
         const validUsers = results
           .filter(result => !result.error && result.data)
           .map(result => result.data)
+          .filter(user => user !== null) as User[]
         setTeamMembers(validUsers)
       } catch (error) {
         console.error('Error fetching team members:', error)
@@ -118,8 +120,15 @@ export function ProjectCard({ id, name, description, progress, dueDate, team = [
           </div>
         </div>
       </CardContent>
-      <CardFooter>
+      <CardFooter className="flex justify-between">
         <div className="text-xs text-primary-blue">View details</div>
+        {userRole && (
+          <div className="text-xs">
+            <Badge variant="outline" className="text-xs">
+              {userRole === 'owner' ? 'Owner' : userRole === 'admin' ? 'Admin' : 'Member'}
+            </Badge>
+          </div>
+        )}
       </CardFooter>
     </Card>
   )
