@@ -1,9 +1,8 @@
-
 import type React from "react"
 import { Inter, Space_Grotesk, JetBrains_Mono } from "next/font/google"
 import "./globals.css"
 import { ThemeProvider } from "@/components/theme-provider"
-import { AuthProvider } from "@/lib/auth-context"
+import { AuthProvider } from "@/hooks/auth"
 import { TaskDetailDrawer } from "@/components/tasks/task-detail-drawer"
 import { TeamMemberDetailDrawer } from "@/components/team/team-member-detail-drawer"
 import { ActivityDetailDrawer } from "@/components/activity/activity-detail-drawer"

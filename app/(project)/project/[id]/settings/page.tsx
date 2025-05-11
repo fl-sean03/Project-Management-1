@@ -13,7 +13,8 @@ import { Switch } from "@/components/ui/switch"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { Separator } from "@/components/ui/separator"
 import { AlertTriangle, Save, Trash } from "lucide-react"
-import { projectService, Project } from "@/lib/supabase-service"
+import { projectService } from "@/lib/services"
+import { Project } from "@/lib/types"
 
 interface SettingsPageProps {
   params: {

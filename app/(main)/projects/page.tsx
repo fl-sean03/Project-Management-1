@@ -8,9 +8,10 @@ import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Plus, Search } from "lucide-react"
-import { projectService, Project } from "@/lib/supabase-service"
+import { projectService } from "@/lib/services"
+import { Project } from "@/lib/types"
 import { NewProjectDialog } from "@/components/projects/new-project-dialog"
-import { useAuth } from "@/lib/auth-context"
+import { useAuth } from "@/hooks/auth"
 
 export default function ProjectsPage() {
   const [projects, setProjects] = useState<Project[]>([])
@@ -21,7 +22,7 @@ export default function ProjectsPage() {
   const [sortBy, setSortBy] = useState("newest")
   const [refreshTrigger, setRefreshTrigger] = useState(0)
   const router = useRouter()
-  const { user, loading: authLoading } = useAuth()
+  const { user, isLoading: authLoading } = useAuth()
 
   useEffect(() => {
     if (!authLoading && !user) {

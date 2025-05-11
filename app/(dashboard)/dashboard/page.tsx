@@ -4,7 +4,8 @@ import { ProjectCard } from "@/components/dashboard/project-card"
 import { TaskList } from "@/components/dashboard/task-list"
 import { ActivityFeed } from "@/components/dashboard/activity-feed"
 import { Header } from "@/components/layout/header"
-import { projectService, taskService, activityService, Task, Activity, Project } from "@/lib/supabase-service"
+import { projectService, taskService, activityService } from "@/lib/services"
+import { Task, Activity, Project } from "@/lib/types"
 
 export default async function DashboardPage() {
   // Fetch projects from Supabase

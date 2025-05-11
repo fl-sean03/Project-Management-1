@@ -14,7 +14,8 @@ import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
-import { projectService, userService, User } from "@/lib/supabase-service"
+import { projectService, userService } from "@/lib/services"
+import { User } from "@/lib/types"
 import { useToast } from "@/components/ui/use-toast"
 
 type TeamInviteDialogProps = {

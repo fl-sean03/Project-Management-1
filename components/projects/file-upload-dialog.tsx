@@ -21,7 +21,8 @@ import {
   SelectTrigger,
   SelectValue 
 } from "@/components/ui/select"
-import { fileService, File as FileRecord } from "@/lib/supabase-service"
+import { fileService } from "@/lib/services"
+import { File as FileRecord } from "@/lib/types"
 import { FileIcon, UploadCloud } from "lucide-react"
 
 type FileUploadDialogProps = {

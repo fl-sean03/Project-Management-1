@@ -53,5 +53,6 @@ export async function GET(req: NextRequest) {
     return NextResponse.redirect(new URL('/login?error=Authentication failed: ' + error.message, req.url))
   }
 
+  console.log('Successfully authenticated with OAuth')
   return response
 } 

@@ -9,7 +9,8 @@ import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
 import { Badge } from "@/components/ui/badge"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { ChevronLeft, ChevronRight, Plus } from "lucide-react"
-import { projectService, taskService, userService, Task, User, Project } from "@/lib/supabase-service"
+import { projectService, taskService, userService } from "@/lib/services"
+import { Task, User, Project } from "@/lib/types"
 
 interface TimelinePageProps {
   params: {

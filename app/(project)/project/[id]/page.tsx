@@ -7,7 +7,7 @@ import { StatsCard } from "@/components/dashboard/stats-card"
 import { TaskList } from "@/components/dashboard/task-list"
 import { ActivityFeed } from "@/components/dashboard/activity-feed"
 import { Header } from "@/components/layout/header"
-import { projectService, taskService, activityService } from "@/lib/supabase-service"
+import { projectService, taskService, activityService } from "@/lib/services"
 
 interface ProjectPageProps {
   params: Promise<{

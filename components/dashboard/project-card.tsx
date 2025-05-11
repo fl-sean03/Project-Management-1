@@ -5,7 +5,8 @@ import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
 import { Progress } from "@/components/ui/progress"
 import { Badge } from "@/components/ui/badge"
 import { useState, useEffect } from "react"
-import { userService, User } from "@/lib/supabase-service"
+import { userService } from "@/lib/services"
+import { User } from "@/lib/types"
 
 interface ProjectCardProps {
   id: string

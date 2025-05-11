@@ -24,7 +24,8 @@ import {
 import { Calendar } from "@/components/ui/calendar"
 import { CalendarIcon } from "lucide-react"
 import { format } from "date-fns"
-import { projectService, Project } from "@/lib/supabase-service"
+import { projectService } from "@/lib/services"
+import { Project } from "@/lib/types"
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover"
 import { cn } from "@/lib/utils"
 import { PostgrestError } from '@supabase/supabase-js'

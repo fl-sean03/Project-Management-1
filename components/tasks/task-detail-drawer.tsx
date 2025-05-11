@@ -1,31 +1,24 @@
 "use client"
 
-import type React from "react"
-
-import { useState, useEffect, Suspense } from "react"
+import { useState, useEffect } from "react"
 import { useRouter, usePathname, useSearchParams } from "next/navigation"
-import { Clock, Calendar, User2, Tag, Paperclip, MessageSquare, CheckSquare } from "lucide-react"
-import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
-import { Badge } from "@/components/ui/badge"
-import { Button } from "@/components/ui/button"
-import { Textarea } from "@/components/ui/textarea"
-import { Separator } from "@/components/ui/separator"
-import { Progress } from "@/components/ui/progress"
 import { Sheet, SheetContent, SheetHeader, SheetTitle } from "@/components/ui/sheet"
-import { taskService, userService, projectService, Task, User, Project } from "@/lib/supabase-service"
+import { taskService, userService, projectService } from "@/lib/services"
+import { TaskDetails } from "./components/task-details"
+import { TaskComments } from "./components/task-comments"
+import type { Task, User, Project } from "@/lib/types"
 
 interface TaskDetailDrawerProps {
   projectId: string
 }
 
-// Inner component that uses search params
-function TaskDetailContent({ projectId }: TaskDetailDrawerProps) {
+export function TaskDetailDrawer({ projectId }: TaskDetailDrawerProps) {
   const router = useRouter()
   const pathname = usePathname()
   const searchParams = useSearchParams()
   const taskId = searchParams.get("taskId")
+  
   const [isMobile, setIsMobile] = useState(false)
-  const [newComment, setNewComment] = useState("")
   const [isOpen, setIsOpen] = useState(false)
   const [currentTaskId, setCurrentTaskId] = useState<string | null>(null)
   
@@ -125,6 +118,8 @@ function TaskDetailContent({ projectId }: TaskDetailDrawerProps) {
           if (!assigneeError && assigneeData) {
             setAssignee(assigneeData);
           }
+        } else {
+          setAssignee(null);
         }
         
         // Fetch project details
@@ -159,217 +154,73 @@ function TaskDetailContent({ projectId }: TaskDetailDrawerProps) {
     // Use window.history directly to update the URL without a full navigation
     window.history.pushState({}, "", `${pathname}${params.toString() ? `?${params.toString()}` : ""}`)
   }
-
-  // Handle comment submission
-  const handleCommentSubmit = (e: React.FormEvent) => {
-    e.preventDefault()
-    // In a real app, this would submit the comment to the backend
-    alert("Comment submitted: " + newComment)
-    setNewComment("")
+  
+  // Handle task status change
+  const handleStatusChange = async () => {
+    await fetchTaskData();
   }
-
-  // Determine status color
-  const getStatusColor = (status: string) => {
-    switch (status) {
-      case "Completed":
-        return "bg-success-green text-white"
-      case "In Progress":
-        return "bg-primary-blue text-white"
-      case "Review":
-        return "bg-secondary-purple text-white"
-      default:
-        return "bg-slate text-white"
+  
+  // Helper function to fetch task data again
+  const fetchTaskData = async () => {
+    if (!currentTaskId) return;
+    
+    try {
+      const { data: taskData, error: taskError } = await taskService.getTaskById(currentTaskId);
+      
+      if (taskError || !taskData) {
+        console.error("Error refreshing task:", taskError);
+        return;
+      }
+      
+      setTask(taskData);
+    } catch (err) {
+      console.error("Error refreshing task data:", err);
     }
-  }
-
-  // Determine priority color
-  const getPriorityColor = (priority: string) => {
-    switch (priority) {
-      case "High":
-        return "bg-destructive-red/10 text-destructive-red"
-      case "Medium":
-        return "bg-amber-100 text-amber-800"
-      default:
-        return "bg-slate-100 text-slate-800"
-    }
-  }
-
-  // Format dates
-  const formatDate = (dateString: string) => {
-    if (!dateString) return "No date";
-    const date = new Date(dateString)
-    return new Intl.DateTimeFormat("en-US", {
-      month: "short",
-      day: "numeric",
-      year: "numeric",
-    }).format(date)
-  }
-
-  // If no task is found or while loading, still render the Sheet but keep it closed or show loading
-  if (!task) {
-    return (
-      <Sheet 
-        open={isOpen} 
-        onOpenChange={(open) => {
-          if (!open) handleClose()
-        }}
-      >
-        <SheetContent 
-          side={isMobile ? "bottom" : "right"} 
-          className={`p-4 ${isMobile ? "h-[90%] rounded-t-lg" : "w-[600px] max-w-[60%]"}`}
-        >
-          {loading ? (
-            <div className="flex h-full items-center justify-center">
-              <p>Loading task details...</p>
-            </div>
-          ) : (
-            <div className="flex h-full items-center justify-center">
-              <p>{error || "Task not found"}</p>
-            </div>
-          )}
-        </SheetContent>
-      </Sheet>
-    )
-  }
+  };
 
   return (
-    <Sheet
-      open={isOpen}
-      onOpenChange={(open) => {
-        if (!open) handleClose()
-      }}
-    >
-      <SheetContent
-        side={isMobile ? "bottom" : "right"}
-        className={`p-0 ${isMobile ? "h-[90%] rounded-t-lg" : "w-[600px] max-w-[60%]"}`}
-      >
-        <div className="flex h-full flex-col overflow-hidden">
-          {/* Header */}
-          <SheetHeader className="border-b p-4">
-            <div className="flex items-center justify-between">
-              <SheetTitle className="text-xl font-bold">{task.title}</SheetTitle>
-            </div>
-            <div className="flex flex-wrap gap-2 mt-2">
-              <Badge className={getStatusColor(task.status)}>{task.status}</Badge>
-              <Badge className={getPriorityColor(task.priority)}>{task.priority}</Badge>
-              {task.tags?.map((tag) => (
-                <Badge key={tag} variant="outline">
-                  {tag}
-                </Badge>
-              ))}
-            </div>
-          </SheetHeader>
-
-          {/* Content */}
-          <div className="flex-1 overflow-y-auto p-4">
-            {/* Description */}
-            <div className="mb-6">
-              <h3 className="mb-2 font-semibold">Description</h3>
-              <p className="text-muted-foreground">{task.description || "No description provided."}</p>
-            </div>
-
-            <div className="grid gap-4 mb-6 md:grid-cols-2">
-              {/* Due Date */}
-              <div className="flex items-center gap-2">
-                <Calendar className="h-4 w-4 text-muted-foreground" />
-                <div>
-                  <p className="text-sm font-medium">Due Date</p>
-                  <p className="text-sm text-muted-foreground">{formatDate(task.dueDate)}</p>
-                </div>
-              </div>
-
-              {/* Assignee */}
-              <div className="flex items-center gap-2">
-                <User2 className="h-4 w-4 text-muted-foreground" />
-                <div>
-                  <p className="text-sm font-medium">Assignee</p>
-                  {assignee ? (
-                    <div className="flex items-center gap-2">
-                      <Avatar className="h-5 w-5">
-                        <AvatarImage src={assignee.avatar || "/placeholder.svg"} alt={assignee.name} />
-                        <AvatarFallback className="text-xs">
-                          {assignee.name
-                            .split(" ")
-                            .map((n) => n[0])
-                            .join("")}
-                        </AvatarFallback>
-                      </Avatar>
-                      <span className="text-sm text-muted-foreground">{assignee.name}</span>
-                    </div>
-                  ) : (
-                    <p className="text-sm text-muted-foreground">Unassigned</p>
-                  )}
-                </div>
-              </div>
-
-              {/* Estimated hours */}
-              <div className="flex items-center gap-2">
-                <Clock className="h-4 w-4 text-muted-foreground" />
-                <div>
-                  <p className="text-sm font-medium">Estimated Hours</p>
-                  <p className="text-sm text-muted-foreground">{task.estimatedHours || "Not estimated"}</p>
-                </div>
-              </div>
-
-              {/* Project */}
-              <div className="flex items-center gap-2">
-                <Tag className="h-4 w-4 text-muted-foreground" />
-                <div>
-                  <p className="text-sm font-medium">Project</p>
-                  <p className="text-sm text-muted-foreground">{project?.name || "Unknown project"}</p>
-                </div>
-              </div>
-            </div>
-
-            <Separator className="my-4" />
-
-            {/* Comments section */}
-            <div className="space-y-4">
-              <h3 className="font-semibold flex items-center gap-2">
-                <MessageSquare className="h-4 w-4" /> Comments
-              </h3>
-
-              {/* This would be populated with real comments in a full app */}
-              <p className="text-center text-sm text-muted-foreground py-4">No comments yet</p>
-
-              {/* Comment form */}
-              <form onSubmit={handleCommentSubmit} className="space-y-2">
-                <Textarea
-                  placeholder="Add a comment..."
-                  value={newComment}
-                  onChange={(e) => setNewComment(e.target.value)}
-                  className="min-h-[100px]"
-                />
-                <div className="flex justify-end">
-                  <Button type="submit" className="bg-primary-blue hover:bg-primary-blue/90">
-                    Post Comment
-                  </Button>
-                </div>
-              </form>
+    <Sheet open={isOpen} onOpenChange={(open) => {
+      if (!open) handleClose();
+    }}>
+      <SheetContent side="right" className="w-full sm:max-w-xl overflow-y-auto">
+        {loading ? (
+          <div className="flex h-full items-center justify-center">
+            <div className="flex flex-col items-center">
+              <div className="h-8 w-8 animate-spin rounded-full border-2 border-primary-blue border-t-transparent"></div>
+              <p className="mt-2 text-sm text-gray-500">Loading task details...</p>
             </div>
           </div>
-
-          {/* Footer */}
-          <div className="border-t p-4">
-            <div className="flex justify-between">
-              <span className="text-sm text-muted-foreground">Created {formatDate(task.createdAt)}</span>
-              <Button variant="outline" size="sm" className="text-primary-blue hover:bg-primary-blue/10">
-                <CheckSquare className="mr-2 h-4 w-4" />
-                Mark as Completed
-              </Button>
+        ) : error ? (
+          <div className="flex h-full items-center justify-center">
+            <div className="rounded-md bg-red-50 p-4 text-center">
+              <p className="text-red-600">{error}</p>
+              <button
+                onClick={handleClose}
+                className="mt-4 rounded-md bg-primary-blue px-4 py-2 text-sm text-white"
+              >
+                Close
+              </button>
             </div>
           </div>
-        </div>
+        ) : task ? (
+          <div className="space-y-6 py-4">
+            <SheetHeader>
+              <SheetTitle>Task Details</SheetTitle>
+            </SheetHeader>
+            
+            <TaskDetails 
+              task={task} 
+              assignee={assignee} 
+              onStatusChange={handleStatusChange} 
+            />
+            
+            <TaskComments 
+              taskId={task.id} 
+              projectId={task.project} 
+            />
+          </div>
+        ) : null}
       </SheetContent>
     </Sheet>
-  )
-}
-
-// Main component with Suspense
-export function TaskDetailDrawer(props: TaskDetailDrawerProps) {
-  return (
-    <Suspense fallback={<div className="hidden">Loading task details...</div>}>
-      <TaskDetailContent {...props} />
-    </Suspense>
   )
 }

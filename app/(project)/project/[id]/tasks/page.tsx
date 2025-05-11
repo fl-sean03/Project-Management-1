@@ -11,7 +11,8 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
 import { Badge } from "@/components/ui/badge"
 import { CheckCircle2, Clock, Plus, Search } from "lucide-react"
-import { projectService, taskService, userService, Task, User, Project } from "@/lib/supabase-service"
+import { projectService, taskService, userService } from "@/lib/services"
+import { Task, User, Project } from "@/lib/types"
 import { NewTaskDialog } from "@/components/projects/new-task-dialog"
 
 interface ProjectTasksPageProps {

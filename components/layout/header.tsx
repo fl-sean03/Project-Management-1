@@ -1,7 +1,7 @@
 "use client"
 
 import Link from "next/link"
-import { useState } from "react"
+import { useState, useEffect } from "react"
 import { Bell, Search, Menu, ChevronLeft } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
@@ -12,7 +12,7 @@ import { currentUser } from "@/mock/users"
 import { notifications } from "@/mock/notifications"
 import { Logo } from "@/components/ui/logo"
 import { useRouter, usePathname } from "next/navigation"
-import { useAuth } from "@/lib/auth-context"
+import { useAuth } from "@/hooks/auth"
 import {
   DropdownMenu,
   DropdownMenuContent,

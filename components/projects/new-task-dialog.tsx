@@ -24,7 +24,8 @@ import {
 import { Calendar } from "@/components/ui/calendar"
 import { CalendarIcon } from "lucide-react"
 import { format } from "date-fns"
-import { taskService, Task, User } from "@/lib/supabase-service"
+import { taskService } from "@/lib/services"
+import { Task, User } from "@/lib/types"
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover"
 import { cn } from "@/lib/utils"
 

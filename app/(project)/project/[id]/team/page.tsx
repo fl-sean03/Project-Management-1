@@ -9,7 +9,8 @@ import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
 import { Mail, Phone, Plus, MapPin, Calendar } from "lucide-react"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
-import { projectService, userService, activityService, Project, User, Activity } from "@/lib/supabase-service"
+import { projectService, userService, activityService } from "@/lib/services"
+import { Project, User, Activity } from "@/lib/types"
 import { TeamInviteDialog } from "@/components/projects/team-invite-dialog"
 
 interface TeamPageProps {

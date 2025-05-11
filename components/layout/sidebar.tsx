@@ -7,7 +7,8 @@ import { LayoutDashboard, ListTodo, Calendar, FileText, Users, Settings, Chevron
 import { cn } from "@/lib/utils"
 import { Logo } from "@/components/ui/logo"
 import { Button } from "@/components/ui/button"
-import { projectService, Project } from "@/lib/supabase-service"
+import { projectService } from "@/lib/services"
+import { Project } from "@/lib/types"
 
 interface SidebarProps {
   className?: string

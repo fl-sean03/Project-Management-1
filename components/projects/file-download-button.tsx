@@ -4,7 +4,7 @@ import { useState } from "react"
 import { Button } from "@/components/ui/button"
 import { Download } from "lucide-react"
 import { getSignedFileUrl } from "@/lib/spaces"
-import { File } from "@/lib/supabase-service"
+import { File } from "@/lib/types"
 
 // Extend the File type to include properties from the database
 interface FileWithStorage extends File {

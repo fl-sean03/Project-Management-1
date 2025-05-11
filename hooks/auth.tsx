@@ -1,7 +1,7 @@
 'use client'
 
 import { useState, useEffect, createContext, useContext, ReactNode } from 'react'
-import { getSupabaseClient } from '@/lib/supabase-service'
+import { createBrowserSupabaseClient } from '@/lib/supabase'
 import { User } from '@supabase/supabase-js'
 import { useRouter } from 'next/navigation'
 
@@ -20,7 +20,7 @@ const AuthContext = createContext<AuthContextType | undefined>(undefined)
 export function AuthProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<User | null>(null)
   const [isLoading, setIsLoading] = useState(true)
-  const supabase = getSupabaseClient()
+  const supabase = createBrowserSupabaseClient()
   const router = useRouter()
 
   useEffect(() => {
@@ -56,6 +56,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   const signIn = async (email: string, password: string) => {
     const { error } = await supabase.auth.signInWithPassword({ email, password })
+    
+    if (!error) {
+      // Redirect to projects page after successful sign-in
+      router.push('/projects')
+    }
+    
     return { error }
   }
 

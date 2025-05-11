@@ -22,7 +22,8 @@ import {
   MoreHorizontal,
 } from "lucide-react"
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu"
-import { projectService, userService, fileService, Project, User, File as FileType } from "@/lib/supabase-service"
+import { projectService, userService, fileService } from "@/lib/services"
+import { Project, User, File as FileType } from "@/lib/types"
 import { FileUploadDialog } from "@/components/projects/file-upload-dialog"
 import { FileDownloadButton } from "@/components/projects/file-download-button"
 
