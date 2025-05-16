@@ -31,10 +31,8 @@ export function TeamInviteDialog({ children, projectId, onMemberAdded }: TeamInv
   const [formError, setFormError] = useState<string | null>(null)
   const [email, setEmail] = useState("")
   const [role, setRole] = useState("member")
-  const [searchResults, setSearchResults] = useState<User[]>([])
   const [selectedUser, setSelectedUser] = useState<User | null>(null)
   const [projectName, setProjectName] = useState("")
-  const [useManualEmail, setUseManualEmail] = useState(false)
   const { toast } = useToast()
   const { user: currentUser } = useAuth()
 
@@ -62,36 +60,18 @@ export function TeamInviteDialog({ children, projectId, onMemberAdded }: TeamInv
     setEmail(value)
     setSelectedUser(null)
     setFormError(null)
-    setUseManualEmail(false)
     
     if (value.trim().length > 2) {
       try {
         // Search users by email
         const { data, error } = await userService.searchUsersByEmail(value.trim())
         if (error) throw error
-        setSearchResults(data || [])
+        if (data && data.length > 0) {
+          setSelectedUser(data[0])
+        }
       } catch (error) {
         console.error("Error searching users:", error)
-        setSearchResults([])
       }
-    } else {
-      setSearchResults([])
-    }
-  }
-
-  const handleUserSelect = (user: User) => {
-    setSelectedUser(user)
-    setEmail(user.email)
-    setSearchResults([])
-    setUseManualEmail(false)
-  }
-  
-  const handleUseEmail = () => {
-    if (email && email.includes('@') && email.includes('.')) {
-      setUseManualEmail(true)
-      setSearchResults([])
-    } else {
-      setFormError("Please enter a valid email address")
     }
   }
 
@@ -147,8 +127,8 @@ export function TeamInviteDialog({ children, projectId, onMemberAdded }: TeamInv
             : `${selectedUser.name} has been added to the project and invitation email sent.`,
         })
         
-        // Call callback - only if this is a new member and the callback exists
-        if (!isExistingMember && onMemberAdded) {
+        // Call callback for both new and existing members
+        if (onMemberAdded) {
           // Add projectRole to user object
           const userWithRole = {
             ...selectedUser,
@@ -161,7 +141,7 @@ export function TeamInviteDialog({ children, projectId, onMemberAdded }: TeamInv
         }
       } 
       // For email invites (non-existing users)
-      else if (useManualEmail) {
+      else {
         if (!email || !email.includes('@') || !email.includes('.')) {
           setFormError("Please enter a valid email address")
           setLoading(false)
@@ -203,11 +183,27 @@ export function TeamInviteDialog({ children, projectId, onMemberAdded }: TeamInv
             title: "Invitation sent",
             description: `An invitation has been sent to ${email}. They'll be added to the project when they sign up.`,
           })
+
+          // Call callback for new email invites
+          if (onMemberAdded && typeof data === 'object' && 'id' in data) {
+            const newUser: User = {
+              id: data.id,
+              email: email,
+              name: email.split('@')[0],
+              projectRole: role,
+              joined_date: new Date().toISOString(),
+              last_active: new Date().toISOString(),
+              avatar: null,
+              role: 'user',
+              department: '',
+              team: '',
+              location: '',
+              phone: '',
+              bio: ''
+            };
+            onMemberAdded(newUser);
+          }
         }
-      } else {
-        setFormError("Please select a user or enter a valid email address")
-        setLoading(false)
-        return
       }
       
       // Reset form
@@ -215,7 +211,6 @@ export function TeamInviteDialog({ children, projectId, onMemberAdded }: TeamInv
       setEmail("")
       setRole("member")
       setSelectedUser(null)
-      setUseManualEmail(false)
       
     } catch (error: any) {
       console.error("Error adding team member:", error)
@@ -233,8 +228,6 @@ export function TeamInviteDialog({ children, projectId, onMemberAdded }: TeamInv
           setRole("member")
           setSelectedUser(null)
           setFormError(null)
-          setSearchResults([])
-          setUseManualEmail(false)
         }
         setOpen(newOpen)
       }
@@ -253,63 +246,13 @@ export function TeamInviteDialog({ children, projectId, onMemberAdded }: TeamInv
           <div className="grid gap-4 py-4">
             <div className="grid items-center gap-2">
               <Label htmlFor="email">Email Address</Label>
-              <div className="relative">
-                <Input
-                  id="email"
-                  placeholder="Enter email address"
-                  value={email}
-                  onChange={handleEmailChange}
-                  autoComplete="off"
-                />
-                {searchResults.length > 0 && !selectedUser && !useManualEmail && (
-                  <div className="absolute left-0 right-0 z-10 mt-1 max-h-60 overflow-auto rounded-md border bg-background p-1 shadow-md">
-                    {searchResults.map(user => (
-                      <div
-                        key={user.id}
-                        className="flex items-center gap-2 p-2 cursor-pointer hover:bg-muted rounded"
-                        onClick={() => handleUserSelect(user)}
-                      >
-                        <div className="h-6 w-6 rounded-full bg-primary-blue text-white flex items-center justify-center text-xs font-medium">
-                          {user.name.split(" ").map(n => n[0]).join("")}
-                        </div>
-                        <div>
-                          <p className="text-sm font-medium">{user.name}</p>
-                          <p className="text-xs text-muted-foreground">{user.email}</p>
-                        </div>
-                      </div>
-                    ))}
-                    
-                    {/* Option to invite by email if no exact match */}
-                    {email && email.includes('@') && (
-                      <div
-                        className="flex items-center gap-2 p-2 cursor-pointer hover:bg-muted rounded mt-1 border-t pt-2"
-                        onClick={handleUseEmail}
-                      >
-                        <div className="h-6 w-6 rounded-full bg-primary text-white flex items-center justify-center text-xs font-medium">
-                          +
-                        </div>
-                        <div>
-                          <p className="text-sm font-medium">Invite by email</p>
-                          <p className="text-xs text-muted-foreground">{email}</p>
-                        </div>
-                      </div>
-                    )}
-                  </div>
-                )}
-              </div>
-              
-              {/* Show when manually entering an email */}
-              {!selectedUser && email && !searchResults.length && email.includes('@') && (
-                <Button 
-                  type="button" 
-                  variant="outline" 
-                  size="sm" 
-                  onClick={handleUseEmail}
-                  className="mt-1"
-                >
-                  Invite {email} to join the project
-                </Button>
-              )}
+              <Input
+                id="email"
+                placeholder="Enter email address"
+                value={email}
+                onChange={handleEmailChange}
+                autoComplete="off"
+              />
             </div>
             
             <div className="grid items-center gap-2">
@@ -319,36 +262,11 @@ export function TeamInviteDialog({ children, projectId, onMemberAdded }: TeamInv
                   <SelectValue placeholder="Select role" />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="admin">Admin</SelectItem>
                   <SelectItem value="member">Member</SelectItem>
                   <SelectItem value="viewer">Viewer</SelectItem>
                 </SelectContent>
               </Select>
             </div>
-            
-            {selectedUser && (
-              <div className="flex items-center gap-2 p-2 rounded bg-muted">
-                <div className="h-8 w-8 rounded-full bg-primary-blue text-white flex items-center justify-center text-sm font-medium">
-                  {selectedUser.name.split(" ").map(n => n[0]).join("")}
-                </div>
-                <div>
-                  <p className="text-sm font-medium">{selectedUser.name}</p>
-                  <p className="text-xs text-muted-foreground">{selectedUser.email}</p>
-                </div>
-              </div>
-            )}
-            
-            {useManualEmail && (
-              <div className="flex items-center gap-2 p-2 rounded bg-muted">
-                <div className="h-8 w-8 rounded-full bg-primary text-white flex items-center justify-center text-sm font-medium">
-                  @
-                </div>
-                <div>
-                  <p className="text-sm font-medium">Invite by Email</p>
-                  <p className="text-xs text-muted-foreground">{email}</p>
-                </div>
-              </div>
-            )}
             
             {formError && (
               <div className="text-sm text-destructive-red">{formError}</div>
@@ -366,7 +284,7 @@ export function TeamInviteDialog({ children, projectId, onMemberAdded }: TeamInv
             <Button
               type="submit"
               className="bg-primary-blue hover:bg-primary-blue/90"
-              disabled={loading || (!selectedUser && !useManualEmail)}
+              disabled={loading || !email}
             >
               {loading ? "Processing..." : (selectedUser ? "Add to Project" : "Send Invitation")}
             </Button>

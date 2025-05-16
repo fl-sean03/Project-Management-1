@@ -8,12 +8,14 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
-import { Mail, Phone, Plus, MapPin, Calendar } from "lucide-react"
+import { Mail, Phone, Plus, MapPin, Calendar, UserMinus } from "lucide-react"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { projectService, userService, activityService } from "@/lib/services"
 import { Project, User, Activity } from "@/lib/types"
 import { TeamInviteDialog } from "@/components/projects/team-invite-dialog"
 import { TeamMemberDetailDrawer } from "@/components/team/team-member-detail-drawer"
+import { useToast } from "@/components/ui/use-toast"
+import { useAuth } from "@/hooks/auth"
 
 interface TeamPageProps {
   params: Promise<{
@@ -29,6 +31,9 @@ export default function TeamPage({ params }: TeamPageProps) {
   const [teamActivities, setTeamActivities] = useState<Activity[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
+  const { toast } = useToast()
+  const { user: currentUser } = useAuth()
+  const [isOwner, setIsOwner] = useState(false)
 
   useEffect(() => {
     if (!id) {
@@ -51,6 +56,9 @@ export default function TeamPage({ params }: TeamPageProps) {
         }
         
         setProject(projectData)
+        
+        // Check if current user is the owner
+        setIsOwner(currentUser?.id === projectData.owner_id)
         
         // Fetch project members from the project_members table
         const { data: projectMembersData, error: projectMembersError } = 
@@ -123,7 +131,7 @@ export default function TeamPage({ params }: TeamPageProps) {
     }
     
     fetchData()
-  }, [id])
+  }, [id, currentUser?.id])
 
   const formatDate = (dateString: string) => {
     try {
@@ -183,6 +191,31 @@ export default function TeamPage({ params }: TeamPageProps) {
     
     return formatDate(lastActiveDate);
   };
+
+  const handleRemoveMember = async (memberId: string) => {
+    try {
+      const { error } = await projectService.removeProjectMember(id, memberId)
+      
+      if (error) {
+        throw error
+      }
+      
+      // Update the team members list
+      setTeamMembers(prev => prev.filter(member => member.id !== memberId))
+      
+      toast({
+        title: "Member removed",
+        description: "The team member has been removed from the project.",
+      })
+    } catch (error) {
+      console.error("Error removing team member:", error)
+      toast({
+        title: "Error",
+        description: "Failed to remove team member. Please try again.",
+        variant: "destructive"
+      })
+    }
+  }
 
   if (loading) {
     return (
@@ -251,17 +284,32 @@ export default function TeamPage({ params }: TeamPageProps) {
                     onClick={() => handleTeamMemberClick(member.id)}
                   >
                     <CardHeader className="pb-2 pt-4 px-4">
-                      <div className="flex items-center gap-3">
-                        <Avatar className="h-16 w-16 border-2 border-background">
-                          <AvatarImage src={member.avatar || "/placeholder.svg"} alt={member.name} />
-                          <AvatarFallback className="text-lg font-semibold">
-                            {member.name.split(" ").map((n) => n[0]).join("")}
-                          </AvatarFallback>
-                        </Avatar>
-                        <div>
-                          <h3 className="font-semibold text-base">{member.name}</h3>
-                          <p className="text-sm text-muted-foreground">{member.projectRole}</p>
+                      <div className="flex justify-between">
+                        <div className="flex items-center gap-3">
+                          <Avatar className="h-16 w-16 border-2 border-background">
+                            <AvatarImage src={member.avatar || "/placeholder.svg"} alt={member.name} />
+                            <AvatarFallback className="text-lg font-semibold">
+                              {member.name.split(" ").map((n) => n[0]).join("")}
+                            </AvatarFallback>
+                          </Avatar>
+                          <div>
+                            <h3 className="font-semibold text-base">{member.name}</h3>
+                            <p className="text-sm text-muted-foreground">{member.projectRole}</p>
+                          </div>
                         </div>
+                          {isOwner && member.id !== currentUser?.id && (
+                            <Button
+                              
+                              className="h-8 bg-red-500 text-white flex items-center gap-1 hover:text-destructive-red hover:bg-destructive-red/10"
+                              onClick={(e) => {
+                                e.stopPropagation()
+                                handleRemoveMember(member.id)
+                              }}
+                            >
+                              <UserMinus className="h-4 w-4" />
+                              Remove
+                            </Button>
+                          )}
                       </div>
                     </CardHeader>
                     <CardContent className="px-4 pb-4 pt-0 space-y-3">

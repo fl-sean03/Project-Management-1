@@ -473,4 +473,24 @@ export const projectService = {
       return { success: false, error: err };
     }
   },
+
+  /**
+   * Remove a team member from a project
+   */
+  async removeProjectMember(projectId: string, userId: string) {
+    const supabase = getSupabaseClient();
+    
+    try {
+      const response = await supabase
+        .from('project_members')
+        .delete()
+        .eq('project_id', projectId)
+        .eq('user_id', userId);
+      
+      return response;
+    } catch (err) {
+      console.error('Error removing project member:', err);
+      return { data: null, error: err };
+    }
+  },
 }; 
