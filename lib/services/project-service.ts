@@ -187,6 +187,79 @@ export const projectService = {
   },
   
   /**
+   * Invite a user to a project by email
+   * This allows inviting both existing and non-existing users
+   */
+  async inviteUserByEmail(projectId: string, email: string, role: string = 'member') {
+    const supabase = getSupabaseClient();
+    
+    try {
+      // First check if a user with this email already exists
+      const { data: existingUser, error: userError } = await supabase
+        .from('users')
+        .select('id')
+        .eq('email', email)
+        .maybeSingle();
+      
+      if (userError && userError.code !== 'PGRST116') {
+        console.error('Error checking existing user:', userError);
+        return { data: null, error: userError };
+      }
+      
+      // If a user with this email exists, add them directly to the project
+      if (existingUser) {
+        return this.addProjectMember(projectId, existingUser.id, role);
+      }
+      
+      // If no user exists with this email, create an invite in the project_email_invites table
+      // First check if there's already a pending invite for this email
+      const { data: pendingInvite, error: inviteError } = await supabase
+        .from('project_email_invites')
+        .select('id')
+        .eq('project_id', projectId)
+        .eq('email', email)
+        .maybeSingle();
+      
+      if (inviteError && inviteError.code !== 'PGRST116') {
+        console.error('Error checking pending invites:', inviteError);
+        return { data: null, error: inviteError };
+      }
+      
+      // If there's already an invite, just return it
+      if (pendingInvite) {
+        return { data: pendingInvite, error: null };
+      }
+      
+      // Get the current user to set as the creator
+      const { data: authData } = await supabase.auth.getUser();
+      const currentUserId = authData?.user?.id;
+      
+      // Create a new invite for the email
+      const { data, error } = await supabase
+        .from('project_email_invites')
+        .insert([{
+          project_id: projectId,
+          email: email,
+          role: role,
+          created_by: currentUserId,
+          created_at: new Date().toISOString(),
+          expires_at: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString() // 30 days from now
+        }])
+        .select();
+      
+      if (error) {
+        console.error('Error creating project email invite:', error);
+        return { data: null, error };
+      }
+      
+      return { data, error: null };
+    } catch (err) {
+      console.error('Error inviting user by email:', err);
+      return { data: null, error: err };
+    }
+  },
+  
+  /**
    * Create a new project
    */
   async createProject(projectData: Partial<Project>) {

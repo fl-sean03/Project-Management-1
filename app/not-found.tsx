@@ -1,15 +1,9 @@
 'use client';
 
-import { Suspense } from 'react';
 import { Button } from '@/components/ui/button';
 import Link from 'next/link';
-import { useSearchParams } from 'next/navigation';
 
-// A component that uses search params - wrapped in Suspense
-function NotFoundContent() {
-  // Explicitly use the search params hook to address the error
-  const searchParams = useSearchParams();
-
+export default function NotFound() {
   return (
     <div className="h-screen w-full flex flex-col items-center justify-center">
       <h1 className="text-4xl font-bold mb-4">404</h1>
@@ -20,13 +14,5 @@ function NotFoundContent() {
         </Button>
       </Link>
     </div>
-  );
-}
-
-export default function NotFound() {
-  return (
-    <Suspense fallback={<div>Loading...</div>}>
-      <NotFoundContent />
-    </Suspense>
   );
 } 
