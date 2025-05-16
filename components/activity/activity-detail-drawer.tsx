@@ -392,7 +392,7 @@ function ActivityDetailContent({ projectId }: ActivityDetailDrawerProps) {
 // Main component with Suspense
 export function ActivityDetailDrawer(props: ActivityDetailDrawerProps) {
   return (
-    <Suspense fallback={<div className="hidden">Loading activity details...</div>}>
+    <Suspense fallback={null}>
       <ActivityDetailContent {...props} />
     </Suspense>
   )
