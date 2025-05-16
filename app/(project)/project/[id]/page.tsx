@@ -8,6 +8,7 @@ import { TaskList } from "@/components/dashboard/task-list"
 import { ActivityFeed } from "@/components/dashboard/activity-feed"
 import { Header } from "@/components/layout/header"
 import { projectService, taskService, activityService } from "@/lib/services"
+import { ActivityDetailDrawer } from "@/components/activity/activity-detail-drawer"
 
 interface ProjectPageProps {
   params: Promise<{
@@ -120,6 +121,7 @@ export default async function ProjectPage({ params }: ProjectPageProps) {
           <ActivityFeed activities={activities} limit={10} />
         </div>
       </div>
+      <ActivityDetailDrawer projectId={id} />
     </>
   )
 }

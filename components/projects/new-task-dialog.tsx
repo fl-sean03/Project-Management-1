@@ -24,7 +24,7 @@ import {
 import { Calendar } from "@/components/ui/calendar"
 import { CalendarIcon } from "lucide-react"
 import { format } from "date-fns"
-import { taskService } from "@/lib/services"
+import { taskService, projectService, userService } from "@/lib/services"
 import { Task, User } from "@/lib/types"
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover"
 import { cn } from "@/lib/utils"
@@ -32,7 +32,6 @@ import { cn } from "@/lib/utils"
 type NewTaskDialogProps = {
   children: React.ReactNode;
   projectId: string;
-  users: User[];
   onTaskCreated?: (task: Task) => void;
   initialDueDate?: Date | null;
   open?: boolean;
@@ -42,7 +41,6 @@ type NewTaskDialogProps = {
 export function NewTaskDialog({ 
   children, 
   projectId, 
-  users, 
   onTaskCreated, 
   initialDueDate,
   open: controlledOpen,
@@ -52,6 +50,7 @@ export function NewTaskDialog({
   const [loading, setLoading] = useState(false)
   const [formError, setFormError] = useState<string | null>(null)
   const [date, setDate] = useState<Date | undefined>(initialDueDate || undefined)
+  const [projectMembers, setProjectMembers] = useState<User[]>([])
   
   // Use controlled or uncontrolled open state
   const open = controlledOpen ?? uncontrolledOpen
@@ -65,9 +64,42 @@ export function NewTaskDialog({
     status: "To Do",
     due_date: initialDueDate ? initialDueDate.toISOString().split('T')[0] : "",
     assignee_id: "unassigned",
-    project_id: projectId,
-    estimated_hours: 0
+    project_id: projectId
   })
+
+  // Fetch project members when the dialog opens
+  useEffect(() => {
+    const fetchProjectMembers = async () => {
+      try {
+        // Get project members
+        const { data: membersData, error: membersError } = await projectService.getProjectMembers(projectId)
+        
+        if (membersError) {
+          console.error("Error fetching project members:", membersError)
+          return
+        }
+
+        if (membersData) {
+          // Fetch user details for each member
+          const memberPromises = membersData.map(member => userService.getUserById(member.user_id))
+          const memberResults = await Promise.all(memberPromises)
+          
+          // Filter out any failed requests and map to User type
+          const validMembers = memberResults
+            .filter(result => !result.error && result.data)
+            .map(result => result.data as User)
+          
+          setProjectMembers(validMembers)
+        }
+      } catch (err) {
+        console.error("Error fetching project members:", err)
+      }
+    }
+
+    if (open) {
+      fetchProjectMembers()
+    }
+  }, [projectId, open])
   
   // Update date when initialDueDate changes
   useEffect(() => {
@@ -92,14 +124,6 @@ export function NewTaskDialog({
     setFormData(prev => ({
       ...prev,
       [name]: value
-    }))
-  }
-  
-  const handleNumberChange = (name: string, value: string) => {
-    const numValue = parseFloat(value) || 0
-    setFormData(prev => ({
-      ...prev,
-      [name]: numValue
     }))
   }
   
@@ -165,8 +189,7 @@ export function NewTaskDialog({
         status: "To Do",
         due_date: "",
         assignee_id: "unassigned",
-        project_id: projectId,
-        estimated_hours: 0
+        project_id: projectId
       })
       setDate(undefined)
       
@@ -194,8 +217,7 @@ export function NewTaskDialog({
           status: "To Do",
           due_date: "",
           assignee_id: "unassigned",
-          project_id: projectId,
-          estimated_hours: 0
+          project_id: projectId
         });
         setDate(undefined);
         setFormError(null);
@@ -205,7 +227,7 @@ export function NewTaskDialog({
       <DialogTrigger asChild>
         {children}
       </DialogTrigger>
-      <DialogContent className="sm:max-w-[525px]">
+      <DialogContent>
         <form onSubmit={handleSubmit}>
           <DialogHeader>
             <DialogTitle>Create New Task</DialogTitle>
@@ -235,75 +257,61 @@ export function NewTaskDialog({
                 className="min-h-[80px]"
               />
             </div>
-            <div className="grid grid-cols-2 gap-4">
-              <div className="grid items-center gap-2">
-                <Label htmlFor="assignee_id">Assignee</Label>
-                <Select
-                  value={formData.assignee_id}
-                  onValueChange={(value) => handleSelectChange("assignee_id", value)}
-                >
-                  <SelectTrigger id="assignee_id">
-                    <SelectValue placeholder="Select assignee" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="unassigned">Unassigned</SelectItem>
-                    {users.map((user) => (
-                      <SelectItem key={user.id} value={user.id}>
-                        {user.name}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
-              <div className="grid items-center gap-2">
-                <Label htmlFor="estimated_hours">Estimated Hours</Label>
-                <Input
-                  id="estimated_hours"
-                  name="estimated_hours"
-                  type="number"
-                  min="0"
-                  step="0.5"
-                  placeholder="0"
-                  value={formData.estimated_hours}
-                  onChange={(e) => handleNumberChange("estimated_hours", e.target.value)}
-                />
-              </div>
+            
+            <div className="grid items-center gap-2">
+              <Label htmlFor="assignee_id">Assignee</Label>
+              <Select
+                value={formData.assignee_id}
+                onValueChange={(value) => handleSelectChange("assignee_id", value)}
+              >
+                <SelectTrigger id="assignee_id">
+                  <SelectValue placeholder="Select assignee" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="unassigned">Unassigned</SelectItem>
+                  {projectMembers.map((member) => (
+                    <SelectItem key={member.id} value={member.id}>
+                      {member.name}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
             </div>
-            <div className="grid grid-cols-2 gap-4">
-              <div className="grid items-center gap-2">
-                <Label htmlFor="priority">Priority</Label>
-                <Select
-                  value={formData.priority}
-                  onValueChange={(value) => handleSelectChange("priority", value)}
-                >
-                  <SelectTrigger id="priority">
-                    <SelectValue placeholder="Select priority" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="Low">Low</SelectItem>
-                    <SelectItem value="Medium">Medium</SelectItem>
-                    <SelectItem value="High">High</SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
-              <div className="grid items-center gap-2">
-                <Label htmlFor="status">Status</Label>
-                <Select
-                  value={formData.status}
-                  onValueChange={(value) => handleSelectChange("status", value)}
-                >
-                  <SelectTrigger id="status">
-                    <SelectValue placeholder="Select status" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="To Do">To Do</SelectItem>
-                    <SelectItem value="In Progress">In Progress</SelectItem>
-                    <SelectItem value="Review">Review</SelectItem>
-                    <SelectItem value="Completed">Completed</SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
+            
+            <div className="grid items-center gap-2">
+              <Label htmlFor="priority">Priority</Label>
+              <Select
+                value={formData.priority}
+                onValueChange={(value) => handleSelectChange("priority", value)}
+              >
+                <SelectTrigger id="priority">
+                  <SelectValue placeholder="Select priority" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="Low">Low</SelectItem>
+                  <SelectItem value="Medium">Medium</SelectItem>
+                  <SelectItem value="High">High</SelectItem>
+                </SelectContent>
+              </Select>
             </div>
+            <div className="grid items-center gap-2">
+              <Label htmlFor="status">Status</Label>
+              <Select
+                value={formData.status}
+                onValueChange={(value) => handleSelectChange("status", value)}
+              >
+                <SelectTrigger id="status">
+                  <SelectValue placeholder="Select status" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="To Do">To Do</SelectItem>
+                  <SelectItem value="In Progress">In Progress</SelectItem>
+                  <SelectItem value="Review">Review</SelectItem>
+                  <SelectItem value="Completed">Completed</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+            
             <div className="grid items-center gap-2">
               <Label htmlFor="due_date">Due Date</Label>
               <Popover>

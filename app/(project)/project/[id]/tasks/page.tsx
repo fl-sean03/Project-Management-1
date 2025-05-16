@@ -42,7 +42,7 @@ function ProjectTasksContent({ params }: ProjectTasksPageProps) {
 
   const [project, setProject] = useState<Project | null>(null)
   const [tasks, setTasks] = useState<Task[]>([])
-  const [users, setUsers] = useState<User[]>([])
+  const [projectMembers, setProjectMembers] = useState<User[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   
@@ -51,7 +51,7 @@ function ProjectTasksContent({ params }: ProjectTasksPageProps) {
   const [assigneeFilter, setAssigneeFilter] = useState("all")
   const [view, setView] = useState("kanban")
 
-  // Fetch project, tasks, and users data
+  // Fetch project, tasks, and project members data
   useEffect(() => {
     const fetchData = async () => {
       setLoading(true)
@@ -72,13 +72,25 @@ function ProjectTasksContent({ params }: ProjectTasksPageProps) {
         }
         setTasks(tasksData || [])
         
-        // Fetch users
-        const { data: usersData, error: usersError } = await userService.getAllUsers()
-        if (usersError) {
-          console.error("Error fetching users:", usersError)
-          throw new Error(usersError.message)
+        // Fetch project members
+        const { data: membersData, error: membersError } = await projectService.getProjectMembers(id)
+        if (membersError) {
+          console.error("Error fetching project members:", membersError)
+          throw new Error(membersError.message)
         }
-        setUsers(usersData || [])
+
+        if (membersData) {
+          // Fetch user details for each member
+          const memberPromises = membersData.map(member => userService.getUserById(member.user_id))
+          const memberResults = await Promise.all(memberPromises)
+          
+          // Filter out any failed requests and map to User type
+          const validMembers = memberResults
+            .filter(result => !result.error && result.data)
+            .map(result => result.data as User)
+          
+          setProjectMembers(validMembers)
+        }
         
       } catch (err: any) {
         setError(err.message || "An error occurred")
@@ -121,7 +133,7 @@ function ProjectTasksContent({ params }: ProjectTasksPageProps) {
   )
 
   const getUser = (userId: string) => {
-    return users.find((user) => user.id === userId)
+    return projectMembers.find((user) => user.id === userId)
   }
 
   const formatDate = (dateString: string) => {
@@ -213,16 +225,15 @@ function ProjectTasksContent({ params }: ProjectTasksPageProps) {
               </SelectTrigger>
               <SelectContent>
                 <SelectItem value="all">All Assignees</SelectItem>
-                {users.map((user) => (
-                  <SelectItem key={user.id} value={user.id}>
-                    {user.name}
+                {projectMembers.map((member) => (
+                  <SelectItem key={member.id} value={member.id}>
+                    {member.name}
                   </SelectItem>
                 ))}
               </SelectContent>
             </Select>
             <NewTaskDialog 
               projectId={id} 
-              users={users}
               onTaskCreated={handleTaskCreated}
             >
               <Button className="bg-primary-blue hover:bg-primary-blue/90">
@@ -289,7 +300,7 @@ function ProjectTasksContent({ params }: ProjectTasksPageProps) {
                                   <AvatarFallback className="text-xs">
                                     {assignee.name
                                       .split(" ")
-                                      .map((n) => n[0])
+                                      .map((n: string) => n[0])
                                       .join("")}
                                   </AvatarFallback>
                                 </Avatar>
@@ -318,7 +329,6 @@ function ProjectTasksContent({ params }: ProjectTasksPageProps) {
                   {(tasksByStatus[status.name]?.length || 0) === 0 && (
                     <div className="rounded-lg border border-dashed p-4 text-left text-sm text-muted-foreground">
                       <p className="mb-2">No tasks</p>
-                      
                     </div>
                   )}
                 </div>
@@ -393,7 +403,7 @@ function ProjectTasksContent({ params }: ProjectTasksPageProps) {
                               <AvatarFallback className="text-xs">
                                 {assignee.name
                                   .split(" ")
-                                  .map((n) => n[0])
+                                  .map((n: string) => n[0])
                                   .join("")}
                               </AvatarFallback>
                             </Avatar>
@@ -407,7 +417,6 @@ function ProjectTasksContent({ params }: ProjectTasksPageProps) {
                     <p className="mb-3">No tasks found</p>
                     <NewTaskDialog 
                       projectId={id} 
-                      users={users}
                       onTaskCreated={handleTaskCreated}
                     >
                       <Button variant="outline" size="sm">

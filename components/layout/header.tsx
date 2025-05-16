@@ -2,7 +2,7 @@
 
 import Link from "next/link"
 import { useState, useEffect } from "react"
-import { Bell, Search, Menu, ChevronLeft } from "lucide-react"
+import { Bell, Search, Menu, ChevronLeft, Plus } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Sheet, SheetContent, SheetTrigger } from "@/components/ui/sheet"
@@ -13,6 +13,7 @@ import { notifications } from "@/mock/notifications"
 import { Logo } from "@/components/ui/logo"
 import { useRouter, usePathname } from "next/navigation"
 import { useAuth } from "@/hooks/auth"
+import { TeamInviteDialog } from "@/components/projects/team-invite-dialog"
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -25,16 +26,18 @@ import {
 interface HeaderProps {
   title?: string
   showLogo?: boolean
+  projectId?: string
+  onMemberAdded?: (user: any) => void
 }
 
-export function Header({ title, showLogo = false }: HeaderProps) {
+export function Header({ title, showLogo = false, projectId, onMemberAdded }: HeaderProps) {
   const [searchQuery, setSearchQuery] = useState("")
   const router = useRouter()
   const pathname = usePathname()
   const { signOut, user } = useAuth()
 
   const isProjectPage = pathname.includes("/project/")
-  const projectId = isProjectPage ? pathname.split("/")[2] : null
+  const currentProjectId = isProjectPage ? pathname.split("/")[2] : projectId
 
   const handleBackToProjects = () => {
     router.push("/projects")
@@ -68,7 +71,7 @@ export function Header({ title, showLogo = false }: HeaderProps) {
               </Button>
             </SheetTrigger>
             <SheetContent side="left" className="p-0">
-              <Sidebar projectId={projectId} />
+              <Sidebar projectId={currentProjectId} />
             </SheetContent>
           </Sheet>
         )}
@@ -79,6 +82,18 @@ export function Header({ title, showLogo = false }: HeaderProps) {
       </div>
 
       <div className="flex flex-1 items-center justify-end gap-4">
+        {currentProjectId && (
+          <TeamInviteDialog 
+            projectId={currentProjectId}
+            onMemberAdded={onMemberAdded}
+          >
+            <Button className="bg-primary-blue rounded-full hover:bg-primary-blue/90">
+              <Plus className="h-6 w-6" />
+              
+            </Button>
+          </TeamInviteDialog>
+        )}
+
         <div className="relative hidden w-full max-w-sm lg:block">
           <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
           <Input

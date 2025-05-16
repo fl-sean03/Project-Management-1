@@ -7,11 +7,7 @@ import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { Separator } from "@/components/ui/separator"
-import { users } from "@/mock/users"
-import { activities } from "@/mock/activities"
-import { tasks } from "@/mock/tasks"
-import { projects } from "@/mock/projects"
-import { files } from "@/mock/files"
+import { userService, activityService, taskService, projectService, fileService } from "@/lib/services"
 import { Sheet, SheetContent, SheetHeader, SheetTitle } from "@/components/ui/sheet"
 
 interface ActivityDetailDrawerProps {
@@ -26,6 +22,12 @@ function ActivityDetailContent({ projectId }: ActivityDetailDrawerProps) {
   const [isMobile, setIsMobile] = useState(false)
   const [isOpen, setIsOpen] = useState(false)
   const [currentActivityId, setCurrentActivityId] = useState<string | null>(null)
+  const [activity, setActivity] = useState<any>(null)
+  const [user, setUser] = useState<any>(null)
+  const [project, setProject] = useState<any>(null)
+  const [targetDetails, setTargetDetails] = useState<any>(null)
+  const [relatedActivities, setRelatedActivities] = useState<any[]>([])
+  const [loading, setLoading] = useState(true)
 
   // Check if we're on mobile
   useEffect(() => {
@@ -89,8 +91,63 @@ function ActivityDetailContent({ projectId }: ActivityDetailDrawerProps) {
     }
   }, [])
 
-  // Find the activity based on activityId
-  const activity = activities.find((a) => a.id === currentActivityId)
+  // Fetch activity and related data
+  useEffect(() => {
+    const fetchData = async () => {
+      if (!currentActivityId) return
+
+      setLoading(true)
+      try {
+        // Fetch activity
+        const { data: activityData, error: activityError } = await activityService.getActivityById(currentActivityId)
+        if (activityError || !activityData) {
+          console.error("Error fetching activity:", activityError)
+          return
+        }
+        setActivity(activityData)
+
+        // Fetch user
+        const { data: userData, error: userError } = await userService.getUserById(activityData.user)
+        if (!userError && userData) {
+          setUser(userData)
+        }
+
+        // Fetch project
+        const { data: projectData, error: projectError } = await projectService.getProjectById(activityData.project)
+        if (!projectError && projectData) {
+          setProject(projectData)
+        }
+
+        // Fetch target details based on activity type
+        if (activityData.target === "task") {
+          const { data: taskData } = await taskService.getTaskById(activityData.targetId)
+          setTargetDetails(taskData)
+        } else if (activityData.target === "file") {
+          const { data: fileData } = await fileService.getFileById(activityData.targetId)
+          setTargetDetails(fileData)
+        } else if (activityData.target === "project") {
+          const { data: projectData } = await projectService.getProjectById(activityData.targetId)
+          setTargetDetails(projectData)
+        }
+
+        // Fetch related activities
+        const { data: relatedActivitiesData } = await activityService.getActivitiesByProject(activityData.project)
+        if (relatedActivitiesData) {
+          setRelatedActivities(
+            relatedActivitiesData
+              .filter((a: any) => a.id !== activityData.id && a.targetId === activityData.targetId && a.target === activityData.target)
+              .slice(0, 3)
+          )
+        }
+      } catch (err) {
+        console.error("Error fetching activity details:", err)
+      } finally {
+        setLoading(false)
+      }
+    }
+
+    fetchData()
+  }, [currentActivityId])
 
   // If no activity is found, still render the Sheet but keep it closed
   if (!activity) {
@@ -99,21 +156,6 @@ function ActivityDetailContent({ projectId }: ActivityDetailDrawerProps) {
         <SheetContent side="right" className="hidden" />
       </Sheet>
     )
-  }
-
-  // Get related data
-  const user = users.find((u) => u.id === activity.user)
-  const project = projects.find((p) => p.id === activity.project)
-
-  // Get target details based on activity type
-  let targetDetails: any = null
-
-  if (activity.target === "task") {
-    targetDetails = tasks.find((t) => t.id === activity.targetId)
-  } else if (activity.target === "file") {
-    targetDetails = files.find((f) => f.id === activity.targetId)
-  } else if (activity.target === "project") {
-    targetDetails = projects.find((p) => p.id === activity.targetId)
   }
 
   // Format dates
@@ -159,32 +201,6 @@ function ActivityDetailContent({ projectId }: ActivityDetailDrawerProps) {
     }
   }
 
-  // Get activity time as a Date object (mock)
-  const getActivityTime = () => {
-    // Convert relative time to a date (mock implementation)
-    const now = new Date()
-    if (activity.time.includes("minute")) {
-      const minutes = Number.parseInt(activity.time.split(" ")[0])
-      return new Date(now.getTime() - minutes * 60 * 1000)
-    } else if (activity.time.includes("hour")) {
-      const hours = Number.parseInt(activity.time.split(" ")[0])
-      return new Date(now.getTime() - hours * 60 * 60 * 1000)
-    } else if (activity.time.includes("day")) {
-      const days = Number.parseInt(activity.time.split(" ")[0])
-      return new Date(now.getTime() - days * 24 * 60 * 60 * 1000)
-    } else if (activity.time.includes("week")) {
-      const weeks = Number.parseInt(activity.time.split(" ")[0])
-      return new Date(now.getTime() - weeks * 7 * 24 * 60 * 60 * 1000)
-    } else if (activity.time.includes("month")) {
-      const months = Number.parseInt(activity.time.split(" ")[0])
-      const date = new Date(now)
-      date.setMonth(date.getMonth() - months)
-      return date
-    } else {
-      return now
-    }
-  }
-
   return (
     <Sheet open={isOpen} onOpenChange={handleClose}>
       <SheetContent side="right" className="w-full sm:max-w-xl overflow-y-auto">
@@ -201,7 +217,6 @@ function ActivityDetailContent({ projectId }: ActivityDetailDrawerProps) {
                   {activity.action.charAt(0).toUpperCase() + activity.action.slice(1)} {activity.target}
                 </SheetTitle>
               </div>
-              {/* Removed our custom close button */}
             </div>
             <div className="flex flex-wrap gap-2 mt-2">
               <Badge variant="outline">{activity.target.charAt(0).toUpperCase() + activity.target.slice(1)}</Badge>
@@ -220,7 +235,7 @@ function ActivityDetailContent({ projectId }: ActivityDetailDrawerProps) {
                     <AvatarFallback>
                       {user.name
                         .split(" ")
-                        .map((n) => n[0])
+                        .map((n: string) => n[0])
                         .join("")}
                     </AvatarFallback>
                   </Avatar>
@@ -230,7 +245,7 @@ function ActivityDetailContent({ projectId }: ActivityDetailDrawerProps) {
                     <span className="font-medium">{user?.name}</span> {activity.action} {activity.target}{" "}
                     <span className="font-medium">{activity.targetName}</span>
                   </p>
-                  <p className="text-sm text-muted-foreground">{formatDate(getActivityTime().toString())}</p>
+                  <p className="text-sm text-muted-foreground">{formatDate(activity.created_at || activity.time)}</p>
                 </div>
               </div>
 
@@ -289,9 +304,9 @@ function ActivityDetailContent({ projectId }: ActivityDetailDrawerProps) {
                               </p>
                               <p className="text-sm">
                                 {activity.target === "task"
-                                  ? users.find((u) => u.id === targetDetails.assignee)?.name || "Unassigned"
+                                  ? user?.name || "Unassigned"
                                   : activity.target === "file"
-                                    ? users.find((u) => u.id === targetDetails.uploadedBy)?.name
+                                    ? user?.name
                                     : user?.name}
                               </p>
                             </div>
@@ -309,40 +324,33 @@ function ActivityDetailContent({ projectId }: ActivityDetailDrawerProps) {
               <div>
                 <h3 className="text-sm font-medium mb-3">Related Activity</h3>
                 <div className="space-y-3">
-                  {activities
-                    .filter(
-                      (a) => a.id !== activity.id && a.targetId === activity.targetId && a.target === activity.target,
-                    )
-                    .slice(0, 3)
-                    .map((relatedActivity) => {
-                      const relatedUser = users.find((u) => u.id === relatedActivity.user)
-                      return (
-                        <div key={relatedActivity.id} className="flex items-start gap-3 border-b pb-3 last:border-0">
-                          {relatedUser && (
-                            <Avatar className="h-6 w-6">
-                              <AvatarImage src={relatedUser.avatar || "/placeholder.svg"} alt={relatedUser.name} />
-                              <AvatarFallback className="text-[10px]">
-                                {relatedUser.name
-                                  .split(" ")
-                                  .map((n) => n[0])
-                                  .join("")}
-                              </AvatarFallback>
-                            </Avatar>
-                          )}
-                          <div>
-                            <p className="text-sm">
-                              <span className="font-medium">{relatedUser?.name}</span> {relatedActivity.action}{" "}
-                              {relatedActivity.action !== "commented" && "this " + relatedActivity.target}
-                            </p>
-                            <p className="text-xs text-muted-foreground">{relatedActivity.time}</p>
-                          </div>
+                  {relatedActivities.map((relatedActivity) => {
+                    const relatedUser = user // Since we're using the same user for now
+                    return (
+                      <div key={relatedActivity.id} className="flex items-start gap-3 border-b pb-3 last:border-0">
+                        {relatedUser && (
+                          <Avatar className="h-6 w-6">
+                            <AvatarImage src={relatedUser.avatar || "/placeholder.svg"} alt={relatedUser.name} />
+                            <AvatarFallback className="text-[10px]">
+                              {relatedUser.name
+                                .split(" ")
+                                .map((n: string) => n[0])
+                                .join("")}
+                            </AvatarFallback>
+                          </Avatar>
+                        )}
+                        <div>
+                          <p className="text-sm">
+                            <span className="font-medium">{relatedUser?.name}</span> {relatedActivity.action}{" "}
+                            {relatedActivity.action !== "commented" && "this " + relatedActivity.target}
+                          </p>
+                          <p className="text-xs text-muted-foreground">{formatDate(relatedActivity.created_at || relatedActivity.time)}</p>
                         </div>
-                      )
-                    })}
+                      </div>
+                    )
+                  })}
 
-                  {activities.filter(
-                    (a) => a.id !== activity.id && a.targetId === activity.targetId && a.target === activity.target,
-                  ).length === 0 && (
+                  {relatedActivities.length === 0 && (
                     <p className="text-sm text-muted-foreground text-center py-2">No related activity found</p>
                   )}
                 </div>

@@ -14,6 +14,7 @@ import { projectService, taskService, userService } from "@/lib/services"
 import { Task, User, Project } from "@/lib/types"
 import { NewTaskDialog } from "@/components/projects/new-task-dialog"
 import { TaskDetailDrawer } from "@/components/tasks/task-detail-drawer"
+import { ActivityDetailDrawer } from "@/components/activity/activity-detail-drawer"
 import { useRouter, useSearchParams } from "next/navigation"
 
 interface TimelinePageProps {
@@ -317,6 +318,8 @@ export default function TimelinePage({ params }: TimelinePageProps) {
 
       {/* Add TaskDetailDrawer */}
       <TaskDetailDrawer projectId={id} />
+      {/* Add ActivityDetailDrawer */}
+      <ActivityDetailDrawer projectId={id} />
     </>
   )
 }
