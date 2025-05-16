@@ -390,10 +390,10 @@ function ActivityDetailContent({ projectId }: ActivityDetailDrawerProps) {
 }
 
 // Main component with Suspense
-export function ActivityDetailDrawer(props: ActivityDetailDrawerProps) {
+export function ActivityDetailDrawer({ projectId }: ActivityDetailDrawerProps) {
   return (
     <Suspense fallback={null}>
-      <ActivityDetailContent {...props} />
+      <ActivityDetailContent projectId={projectId} />
     </Suspense>
   )
 }

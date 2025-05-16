@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useEffect } from "react"
+import { useState, useEffect, Suspense } from "react"
 import { useRouter, usePathname, useSearchParams } from "next/navigation"
 import { Sheet, SheetContent, SheetHeader, SheetTitle } from "@/components/ui/sheet"
 import { taskService, userService, projectService } from "@/lib/services"
@@ -12,7 +12,8 @@ interface TaskDetailDrawerProps {
   projectId: string
 }
 
-export function TaskDetailDrawer({ projectId }: TaskDetailDrawerProps) {
+// Inner component that uses search params
+function TaskDetailContent({ projectId }: TaskDetailDrawerProps) {
   const router = useRouter()
   const pathname = usePathname()
   const searchParams = useSearchParams()
@@ -222,5 +223,13 @@ export function TaskDetailDrawer({ projectId }: TaskDetailDrawerProps) {
         ) : null}
       </SheetContent>
     </Sheet>
+  )
+}
+
+export function TaskDetailDrawer({ projectId }: TaskDetailDrawerProps) {
+  return (
+    <Suspense fallback={null}>
+      <TaskDetailContent projectId={projectId} />
+    </Suspense>
   )
 }

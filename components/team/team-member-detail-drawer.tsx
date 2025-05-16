@@ -442,10 +442,10 @@ function TeamMemberDetailContent({ projectId }: TeamMemberDetailDrawerProps) {
 }
 
 // Main component with Suspense
-export function TeamMemberDetailDrawer(props: TeamMemberDetailDrawerProps) {
+export function TeamMemberDetailDrawer({ projectId }: TeamMemberDetailDrawerProps) {
   return (
-    <Suspense fallback={<div className="hidden">Loading team member details...</div>}>
-      <TeamMemberDetailContent {...props} />
+    <Suspense fallback={null}>
+      <TeamMemberDetailContent projectId={projectId} />
     </Suspense>
   )
 }

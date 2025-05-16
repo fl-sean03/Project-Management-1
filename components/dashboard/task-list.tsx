@@ -189,16 +189,7 @@ function TaskListContent({ tasks, title, limit = 5 }: TaskListProps) {
 // Main component with Suspense
 export function TaskList(props: TaskListProps) {
   return (
-    <Suspense fallback={
-      <Card>
-        <CardHeader className="pb-2">
-          <CardTitle className="text-lg">{props.title}</CardTitle>
-        </CardHeader>
-        <CardContent>
-          <div className="py-4 text-center text-sm text-muted-foreground">Loading tasks...</div>
-        </CardContent>
-      </Card>
-    }>
+    <Suspense fallback={null}>
       <TaskListContent {...props} />
     </Suspense>
   )
