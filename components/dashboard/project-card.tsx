@@ -1,8 +1,12 @@
+"use client"
+
 import { Card, CardContent, CardFooter, CardHeader, CardTitle } from "@/components/ui/card"
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
 import { Progress } from "@/components/ui/progress"
 import { Badge } from "@/components/ui/badge"
-import { users } from "@/mock/users"
+import { useState, useEffect } from "react"
+import { userService } from "@/lib/services"
+import { User } from "@/lib/types"
 
 interface ProjectCardProps {
   id: string
@@ -10,12 +14,35 @@ interface ProjectCardProps {
   description: string
   progress: number
   dueDate: string
-  team: string[]
+  team: string[] | null
   status: string
   priority: string
+  userRole?: string
 }
 
-export function ProjectCard({ id, name, description, progress, dueDate, team, status, priority }: ProjectCardProps) {
+export function ProjectCard({ id, name, description, progress, dueDate, team = [], status, priority, userRole }: ProjectCardProps) {
+  const [teamMembers, setTeamMembers] = useState<User[]>([])
+  
+  useEffect(() => {
+    const fetchTeamMembers = async () => {
+      try {
+        if (!team || !Array.isArray(team) || team.length === 0) return;
+        
+        const promises = team.map(userId => userService.getUserById(userId))
+        const results = await Promise.all(promises)
+        const validUsers = results
+          .filter(result => !result.error && result.data)
+          .map(result => result.data)
+          .filter(user => user !== null) as User[]
+        setTeamMembers(validUsers)
+      } catch (error) {
+        console.error('Error fetching team members:', error)
+      }
+    }
+    
+    fetchTeamMembers()
+  }, [team])
+
   const statusColors = {
     Completed: "bg-success-green text-white",
     "In Progress": "bg-primary-blue text-white",
@@ -33,15 +60,21 @@ export function ProjectCard({ id, name, description, progress, dueDate, team, st
   const priorityColor = priorityColors[priority as keyof typeof priorityColors] || "bg-slate-100 text-slate-800"
 
   const formatDate = (dateString: string) => {
-    const date = new Date(dateString)
-    return new Intl.DateTimeFormat("en-US", {
-      month: "short",
-      day: "numeric",
-      year: "numeric",
-    }).format(date)
+    try {
+      const date = new Date(dateString)
+      return new Intl.DateTimeFormat("en-US", {
+        month: "short",
+        day: "numeric",
+        year: "numeric",
+      }).format(date)
+    } catch (e) {
+      console.error("Invalid date:", dateString)
+      return "Invalid date"
+    }
   }
 
-  const teamMembers = team.map((userId) => users.find((user) => user.id === userId)).filter(Boolean)
+  // Ensure team is an array
+  const safeTeam = team || []
 
   return (
     <Card className="h-full transition-all hover:shadow-md">
@@ -79,16 +112,23 @@ export function ProjectCard({ id, name, description, progress, dueDate, team, st
                 </AvatarFallback>
               </Avatar>
             ))}
-            {team.length > 3 && (
+            {safeTeam.length > 3 && (
               <div className="flex h-6 w-6 items-center justify-center rounded-full border-2 border-white bg-muted text-xs">
-                +{team.length - 3}
+                +{safeTeam.length - 3}
               </div>
             )}
           </div>
         </div>
       </CardContent>
-      <CardFooter>
+      <CardFooter className="flex justify-between">
         <div className="text-xs text-primary-blue">View details</div>
+        {userRole && (
+          <div className="text-xs">
+            <Badge variant="outline" className="text-xs">
+              {userRole === 'owner' ? 'Owner' : userRole === 'admin' ? 'Admin' : 'Member'}
+            </Badge>
+          </div>
+        )}
       </CardFooter>
     </Card>
   )

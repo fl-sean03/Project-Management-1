@@ -1,36 +1,33 @@
 "use client"
 
-import type React from "react"
-
-import { useState, useEffect } from "react"
+import { useState, useEffect, Suspense } from "react"
 import { useRouter, usePathname, useSearchParams } from "next/navigation"
-import { Clock, Calendar, User2, Tag, Paperclip, MessageSquare, CheckSquare } from "lucide-react"
-import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
-import { Badge } from "@/components/ui/badge"
-import { Button } from "@/components/ui/button"
-import { Textarea } from "@/components/ui/textarea"
-import { Separator } from "@/components/ui/separator"
-import { tasks } from "@/mock/tasks"
-import { users } from "@/mock/users"
-import { projects } from "@/mock/projects"
-import { activities } from "@/mock/activities"
-import { files } from "@/mock/files"
-import { Progress } from "@/components/ui/progress"
 import { Sheet, SheetContent, SheetHeader, SheetTitle } from "@/components/ui/sheet"
+import { taskService, userService, projectService } from "@/lib/services"
+import { TaskDetails } from "./components/task-details"
+import { TaskComments } from "./components/task-comments"
+import type { Task, User, Project } from "@/lib/types"
 
 interface TaskDetailDrawerProps {
   projectId: string
 }
 
-export function TaskDetailDrawer({ projectId }: TaskDetailDrawerProps) {
+// Inner component that uses search params
+function TaskDetailContent({ projectId }: TaskDetailDrawerProps) {
   const router = useRouter()
   const pathname = usePathname()
   const searchParams = useSearchParams()
   const taskId = searchParams.get("taskId")
+  
   const [isMobile, setIsMobile] = useState(false)
-  const [newComment, setNewComment] = useState("")
   const [isOpen, setIsOpen] = useState(false)
   const [currentTaskId, setCurrentTaskId] = useState<string | null>(null)
+  
+  const [task, setTask] = useState<Task | null>(null)
+  const [assignee, setAssignee] = useState<User | null>(null)
+  const [project, setProject] = useState<Project | null>(null)
+  const [loading, setLoading] = useState(false)
+  const [error, setError] = useState<string | null>(null)
 
   // Check if we're on mobile
   useEffect(() => {
@@ -56,9 +53,9 @@ export function TaskDetailDrawer({ projectId }: TaskDetailDrawerProps) {
     }
   }, [taskId])
 
-  // Listen for custom urlchange events
+  // Listen for custom taskchange events
   useEffect(() => {
-    const handleUrlChange = (event: Event) => {
+    const handleTaskChange = (event: Event) => {
       const customEvent = event as CustomEvent<{ taskId: string }>
       if (customEvent.detail?.taskId) {
         setIsOpen(true)
@@ -66,10 +63,10 @@ export function TaskDetailDrawer({ projectId }: TaskDetailDrawerProps) {
       }
     }
 
-    window.addEventListener("urlchange", handleUrlChange)
+    window.addEventListener("taskchange", handleTaskChange)
 
     return () => {
-      window.removeEventListener("urlchange", handleUrlChange)
+      window.removeEventListener("taskchange", handleTaskChange)
     }
   }, [])
 
@@ -94,37 +91,57 @@ export function TaskDetailDrawer({ projectId }: TaskDetailDrawerProps) {
     }
   }, [])
 
-  // Find the task based on taskId
-  const task = tasks.find((t) => t.id === currentTaskId)
-
-  // If no task is found, still render the Sheet but keep it closed
-  if (!task) {
-    return (
-      <Sheet open={false} onOpenChange={() => {}}>
-        <SheetContent side="right" className="hidden" />
-      </Sheet>
-    )
-  }
-
-  // Get related data
-  const assignee = users.find((user) => user.id === task.assignee)
-  const project = projects.find((p) => p.id === task.project)
-
-  // Get task activities
-  const taskActivities = activities.filter((activity) => activity.targetId === task.id && activity.target === "task")
-
-  // Get task attachments
-  const taskAttachments = files.filter((file) => file.project === task.project).slice(0, 2) // Just take the first 2 files for demo purposes
-
-  // Format dates
-  const formatDate = (dateString: string) => {
-    const date = new Date(dateString)
-    return new Intl.DateTimeFormat("en-US", {
-      month: "short",
-      day: "numeric",
-      year: "numeric",
-    }).format(date)
-  }
+  // Fetch task data when currentTaskId changes
+  useEffect(() => {
+    const fetchTaskData = async () => {
+      if (!currentTaskId) return;
+      
+      setLoading(true);
+      setError(null);
+      
+      try {
+        // Fetch task details
+        const { data: taskData, error: taskError } = await taskService.getTaskById(currentTaskId);
+        
+        if (taskError || !taskData) {
+          console.error("Error fetching task:", taskError);
+          setError("Failed to load task data");
+          setLoading(false);
+          return;
+        }
+        
+        setTask(taskData);
+        
+        // Fetch assignee details if available
+        if (taskData.assignee) {
+          const { data: assigneeData, error: assigneeError } = await userService.getUserById(taskData.assignee);
+          
+          if (!assigneeError && assigneeData) {
+            setAssignee(assigneeData);
+          }
+        } else {
+          setAssignee(null);
+        }
+        
+        // Fetch project details
+        if (taskData.project) {
+          const { data: projectData, error: projectError } = await projectService.getProjectById(taskData.project);
+          
+          if (!projectError && projectData) {
+            setProject(projectData);
+          }
+        }
+        
+      } catch (err) {
+        console.error("Error loading task data:", err);
+        setError("An unexpected error occurred");
+      } finally {
+        setLoading(false);
+      }
+    };
+    
+    fetchTaskData();
+  }, [currentTaskId]);
 
   // Handle close with a more direct approach to URL updating
   const handleClose = () => {
@@ -138,280 +155,81 @@ export function TaskDetailDrawer({ projectId }: TaskDetailDrawerProps) {
     // Use window.history directly to update the URL without a full navigation
     window.history.pushState({}, "", `${pathname}${params.toString() ? `?${params.toString()}` : ""}`)
   }
-
-  // Handle comment submission
-  const handleCommentSubmit = (e: React.FormEvent) => {
-    e.preventDefault()
-    // In a real app, this would submit the comment to the backend
-    alert("Comment submitted: " + newComment)
-    setNewComment("")
+  
+  // Handle task status change
+  const handleStatusChange = async () => {
+    await fetchTaskData();
   }
-
-  // Determine status color
-  const getStatusColor = (status: string) => {
-    switch (status) {
-      case "Completed":
-        return "bg-success-green text-white"
-      case "In Progress":
-        return "bg-primary-blue text-white"
-      case "Review":
-        return "bg-secondary-purple text-white"
-      default:
-        return "bg-slate text-white"
+  
+  // Helper function to fetch task data again
+  const fetchTaskData = async () => {
+    if (!currentTaskId) return;
+    
+    try {
+      const { data: taskData, error: taskError } = await taskService.getTaskById(currentTaskId);
+      
+      if (taskError || !taskData) {
+        console.error("Error refreshing task:", taskError);
+        return;
+      }
+      
+      setTask(taskData);
+    } catch (err) {
+      console.error("Error refreshing task data:", err);
     }
-  }
-
-  // Determine priority color
-  const getPriorityColor = (priority: string) => {
-    switch (priority) {
-      case "High":
-        return "bg-destructive-red/10 text-destructive-red"
-      case "Medium":
-        return "bg-amber-100 text-amber-800"
-      default:
-        return "bg-slate-100 text-slate-800"
-    }
-  }
+  };
 
   return (
-    <Sheet
-      open={isOpen}
-      onOpenChange={(open) => {
-        if (!open) handleClose()
-      }}
-    >
-      <SheetContent
-        side={isMobile ? "bottom" : "right"}
-        className={`p-0 ${isMobile ? "h-[90%] rounded-t-lg" : "w-[600px] max-w-[60%]"}`}
-      >
-        <div className="flex h-full flex-col overflow-hidden">
-          {/* Header */}
-          <SheetHeader className="border-b p-4">
-            <div className="flex items-center justify-between">
-              <SheetTitle className="text-xl font-bold">{task.title}</SheetTitle>
-              {/* Removed our custom close button */}
-            </div>
-            <div className="flex flex-wrap gap-2 mt-2">
-              <Badge className={getStatusColor(task.status)}>{task.status}</Badge>
-              <Badge className={getPriorityColor(task.priority)}>{task.priority}</Badge>
-              {task.tags?.map((tag) => (
-                <Badge key={tag} variant="outline">
-                  {tag}
-                </Badge>
-              ))}
-            </div>
-          </SheetHeader>
-
-          {/* Content - Scrollable */}
-          <div className="flex-1 overflow-y-auto p-4">
-            <div className="space-y-6">
-              {/* Description */}
-              <div>
-                <h3 className="text-sm font-medium text-muted-foreground mb-2">Description</h3>
-                <p className="text-sm">{task.description}</p>
-              </div>
-
-              {/* Details */}
-              <div className="grid gap-4 sm:grid-cols-2">
-                <div className="space-y-3">
-                  <div className="flex items-center gap-2">
-                    <Calendar className="h-4 w-4 text-muted-foreground" />
-                    <div>
-                      <p className="text-xs text-muted-foreground">Due Date</p>
-                      <p className="text-sm font-medium">{formatDate(task.dueDate)}</p>
-                    </div>
-                  </div>
-                  <div className="flex items-center gap-2">
-                    <Clock className="h-4 w-4 text-muted-foreground" />
-                    <div>
-                      <p className="text-xs text-muted-foreground">Estimated Time</p>
-                      <p className="text-sm font-medium">{task.estimatedHours} hours</p>
-                    </div>
-                  </div>
-                </div>
-                <div className="space-y-3">
-                  <div className="flex items-center gap-2">
-                    <User2 className="h-4 w-4 text-muted-foreground" />
-                    <div>
-                      <p className="text-xs text-muted-foreground">Assignee</p>
-                      <div className="flex items-center gap-2">
-                        {assignee && (
-                          <Avatar className="h-5 w-5">
-                            <AvatarImage src={assignee.avatar || "/placeholder.svg"} alt={assignee.name} />
-                            <AvatarFallback className="text-[10px]">
-                              {assignee.name
-                                .split(" ")
-                                .map((n) => n[0])
-                                .join("")}
-                            </AvatarFallback>
-                          </Avatar>
-                        )}
-                        <p className="text-sm font-medium">{assignee?.name || "Unassigned"}</p>
-                      </div>
-                    </div>
-                  </div>
-                  <div className="flex items-center gap-2">
-                    <Tag className="h-4 w-4 text-muted-foreground" />
-                    <div>
-                      <p className="text-xs text-muted-foreground">Project</p>
-                      <p className="text-sm font-medium">{project?.name || "No project"}</p>
-                    </div>
-                  </div>
-                </div>
-              </div>
-
-              {/* Progress */}
-              <div>
-                <div className="flex justify-between text-sm mb-1">
-                  <span className="text-muted-foreground">Progress</span>
-                  <span className="font-medium">
-                    {task.status === "Completed" ? "100" : task.status === "In Progress" ? "50" : "0"}%
-                  </span>
-                </div>
-                <Progress
-                  value={task.status === "Completed" ? 100 : task.status === "In Progress" ? 50 : 0}
-                  className="h-2"
-                />
-              </div>
-
-              <Separator />
-
-              {/* Attachments */}
-              <div>
-                <h3 className="flex items-center gap-2 text-sm font-medium mb-3">
-                  <Paperclip className="h-4 w-4" />
-                  Attachments ({taskAttachments.length})
-                </h3>
-                {taskAttachments.length > 0 ? (
-                  <div className="space-y-2">
-                    {taskAttachments.map((file) => (
-                      <div key={file.id} className="flex items-center justify-between rounded-md border p-2">
-                        <div className="flex items-center gap-2">
-                          <div className="rounded-md bg-muted p-1">
-                            <Paperclip className="h-4 w-4" />
-                          </div>
-                          <div>
-                            <p className="text-sm font-medium">{file.name}</p>
-                            <p className="text-xs text-muted-foreground">{file.size}</p>
-                          </div>
-                        </div>
-                        <Button variant="ghost" size="sm">
-                          Download
-                        </Button>
-                      </div>
-                    ))}
-                  </div>
-                ) : (
-                  <p className="text-sm text-muted-foreground">No attachments</p>
-                )}
-                <Button variant="outline" size="sm" className="mt-2">
-                  <Paperclip className="mr-2 h-4 w-4" />
-                  Add Attachment
-                </Button>
-              </div>
-
-              <Separator />
-
-              {/* Comments */}
-              <div>
-                <h3 className="flex items-center gap-2 text-sm font-medium mb-3">
-                  <MessageSquare className="h-4 w-4" />
-                  Comments ({task.comments})
-                </h3>
-                <div className="space-y-4">
-                  {taskActivities
-                    .filter((activity) => activity.action === "commented")
-                    .map((activity) => {
-                      const user = users.find((u) => u.id === activity.user)
-                      return (
-                        <div key={activity.id} className="flex gap-3">
-                          {user && (
-                            <Avatar className="h-8 w-8">
-                              <AvatarImage src={user.avatar || "/placeholder.svg"} alt={user.name} />
-                              <AvatarFallback>
-                                {user.name
-                                  .split(" ")
-                                  .map((n) => n[0])
-                                  .join("")}
-                              </AvatarFallback>
-                            </Avatar>
-                          )}
-                          <div className="flex-1 space-y-1">
-                            <div className="flex items-center justify-between">
-                              <p className="text-sm font-medium">{user?.name}</p>
-                              <p className="text-xs text-muted-foreground">{activity.time}</p>
-                            </div>
-                            <p className="text-sm">{activity.content || "No comment content available."}</p>
-                          </div>
-                        </div>
-                      )
-                    })}
-
-                  {/* New comment form */}
-                  <form onSubmit={handleCommentSubmit} className="mt-4">
-                    <Textarea
-                      placeholder="Add a comment..."
-                      value={newComment}
-                      onChange={(e) => setNewComment(e.target.value)}
-                      className="mb-2"
-                    />
-                    <Button type="submit" size="sm" disabled={!newComment.trim()}>
-                      Add Comment
-                    </Button>
-                  </form>
-                </div>
-              </div>
-
-              <Separator />
-
-              {/* Activity */}
-              <div>
-                <h3 className="text-sm font-medium mb-3">Activity</h3>
-                <div className="space-y-3">
-                  {taskActivities.map((activity) => {
-                    const user = users.find((u) => u.id === activity.user)
-                    return (
-                      <div key={activity.id} className="flex items-start gap-3">
-                        {user && (
-                          <Avatar className="h-6 w-6">
-                            <AvatarImage src={user.avatar || "/placeholder.svg"} alt={user.name} />
-                            <AvatarFallback className="text-xs">
-                              {user.name
-                                .split(" ")
-                                .map((n) => n[0])
-                                .join("")}
-                            </AvatarFallback>
-                          </Avatar>
-                        )}
-                        <div>
-                          <p className="text-sm">
-                            <span className="font-medium">{user?.name}</span> {activity.action}{" "}
-                            {activity.action !== "commented" && "this task"}
-                          </p>
-                          <p className="text-xs text-muted-foreground">{activity.time}</p>
-                        </div>
-                      </div>
-                    )
-                  })}
-                </div>
-              </div>
+    <Sheet open={isOpen} onOpenChange={(open) => {
+      if (!open) handleClose();
+    }}>
+      <SheetContent side="right" className="w-full sm:max-w-xl overflow-y-auto">
+        {loading ? (
+          <div className="flex h-full items-center justify-center">
+            <div className="flex flex-col items-center">
+              <div className="h-8 w-8 animate-spin rounded-full border-2 border-primary-blue border-t-transparent"></div>
+              <p className="mt-2 text-sm text-gray-500">Loading task details...</p>
             </div>
           </div>
-
-          {/* Footer */}
-          <div className="border-t p-4">
-            <div className="flex justify-between">
-              <Button variant="outline" size="sm">
-                <CheckSquare className="mr-2 h-4 w-4" />
-                {task.status === "Completed" ? "Reopen Task" : "Mark Complete"}
-              </Button>
-              <Button variant="default" size="sm" className="bg-primary-blue hover:bg-primary-blue/90">
-                Edit Task
-              </Button>
+        ) : error ? (
+          <div className="flex h-full items-center justify-center">
+            <div className="rounded-md bg-red-50 p-4 text-center">
+              <p className="text-red-600">{error}</p>
+              <button
+                onClick={handleClose}
+                className="mt-4 rounded-md bg-primary-blue px-4 py-2 text-sm text-white"
+              >
+                Close
+              </button>
             </div>
           </div>
-        </div>
+        ) : task ? (
+          <div className="space-y-6 py-4">
+            <SheetHeader>
+              <SheetTitle>Task Details</SheetTitle>
+            </SheetHeader>
+            
+            <TaskDetails 
+              task={task} 
+              assignee={assignee} 
+              onStatusChange={handleStatusChange} 
+            />
+            
+            <TaskComments 
+              taskId={task.id} 
+              projectId={task.project} 
+            />
+          </div>
+        ) : null}
       </SheetContent>
     </Sheet>
+  )
+}
+
+export function TaskDetailDrawer({ projectId }: TaskDetailDrawerProps) {
+  return (
+    <Suspense fallback={null}>
+      <TaskDetailContent projectId={projectId} />
+    </Suspense>
   )
 }

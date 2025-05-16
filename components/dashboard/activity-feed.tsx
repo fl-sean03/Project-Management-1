@@ -67,7 +67,11 @@ export function ActivityFeed({ activities, limit = 5 }: ActivityFeedProps) {
     window.history.pushState({}, "", `${window.location.pathname}?${params.toString()}`)
 
     // Dispatch a custom event to notify the ActivityDetailDrawer that the URL has changed
-    window.dispatchEvent(new CustomEvent("activitychange", { detail: { activityId } }))
+    const event = new CustomEvent("activitychange", { 
+      detail: { activityId },
+      bubbles: true 
+    })
+    window.dispatchEvent(event)
   }
 
   return (

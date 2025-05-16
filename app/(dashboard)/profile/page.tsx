@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import { useAuth } from '@/lib/auth-context';
+import { useAuth } from '@/hooks/auth';
 import { notFound } from 'next/navigation';
 import { Header } from '@/components/layout/header';
 import { Button } from '@/components/ui/button';
@@ -12,9 +12,11 @@ import { Alert, AlertDescription } from '@/components/ui/alert';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { LogOut, UserCircle, Key, Settings, AlertTriangle } from 'lucide-react';
+import { usePathname } from 'next/navigation';
 
 export default function ProfilePage() {
-  const { user, signOut, loading } = useAuth();
+  const pathname = usePathname();
+  const { user, signOut, isLoading: authLoading } = useAuth();
   const [name, setName] = useState('');
   const [avatarUrl, setAvatarUrl] = useState('');
   const [currentPassword, setCurrentPassword] = useState('');
@@ -33,7 +35,7 @@ export default function ProfilePage() {
     }
   }, [user]);
 
-  if (loading) {
+  if (authLoading) {
     return <div className="flex items-center justify-center h-screen">Loading...</div>;
   }
 

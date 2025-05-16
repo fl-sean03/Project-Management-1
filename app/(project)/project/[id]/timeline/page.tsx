@@ -1,18 +1,21 @@
 "use client"
 
-import { useState } from "react"
+import { useState, useEffect } from "react"
+import { use } from 'react'
 import { notFound } from "next/navigation"
-import { use } from "react"
 import { Header } from "@/components/layout/header"
-import { tasks } from "@/mock/tasks"
-import { projects } from "@/mock/projects"
-import { users } from "@/mock/users"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent } from "@/components/ui/card"
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
 import { Badge } from "@/components/ui/badge"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { ChevronLeft, ChevronRight, Plus } from "lucide-react"
+import { projectService, taskService, userService } from "@/lib/services"
+import { Task, User, Project } from "@/lib/types"
+import { NewTaskDialog } from "@/components/projects/new-task-dialog"
+import { TaskDetailDrawer } from "@/components/tasks/task-detail-drawer"
+import { ActivityDetailDrawer } from "@/components/activity/activity-detail-drawer"
+import { useRouter, useSearchParams } from "next/navigation"
 
 interface TimelinePageProps {
   params: Promise<{
@@ -22,16 +25,66 @@ interface TimelinePageProps {
 
 export default function TimelinePage({ params }: TimelinePageProps) {
   const { id } = use(params)
-  const project = projects.find((p) => p.id === id)
-  if (!project) {
-    notFound()
-  }
-
+  const router = useRouter()
+  const searchParams = useSearchParams()
   const [timeframe, setTimeframe] = useState("month")
   const [currentDate, setCurrentDate] = useState(new Date())
+  const [selectedDate, setSelectedDate] = useState<Date | null>(null)
+  const [isNewTaskDialogOpen, setIsNewTaskDialogOpen] = useState(false)
+  
+  const [project, setProject] = useState<Project | null>(null)
+  const [tasks, setTasks] = useState<Task[]>([])
+  const [users, setUsers] = useState<User[]>([])
+  const [loading, setLoading] = useState(true)
+  const [error, setError] = useState<string | null>(null)
 
-  // Filter tasks for this project
-  const projectTasks = tasks.filter((task) => task.project === project.id)
+  // Fetch project, tasks, and users data
+  useEffect(() => {
+    const fetchData = async () => {
+      setLoading(true)
+      try {
+        // Fetch project
+        const { data: projectData, error: projectError } = await projectService.getProjectById(id)
+        if (projectError || !projectData) {
+          console.error("Error fetching project:", projectError)
+          throw new Error(projectError?.message || "Failed to fetch project")
+        }
+        setProject(projectData)
+        
+        // Fetch tasks
+        const { data: tasksData, error: tasksError } = await taskService.getTasksByProject(id)
+        if (tasksError) {
+          console.error("Error fetching tasks:", tasksError)
+          throw new Error(tasksError.message)
+        }
+        setTasks(tasksData || [])
+        
+        // Fetch users
+        const { data: usersData, error: usersError } = await userService.getAllUsers()
+        if (usersError) {
+          console.error("Error fetching users:", usersError)
+          throw new Error(usersError.message)
+        }
+        setUsers(usersData || [])
+        
+      } catch (err: any) {
+        setError(err.message || "An error occurred")
+      } finally {
+        setLoading(false)
+      }
+    }
+    
+    fetchData()
+  }, [id])
+
+  // If loading or error, show appropriate UI
+  if (loading) {
+    return <div className="p-4">Loading timeline data...</div>
+  }
+  
+  if (error || !project) {
+    return notFound()
+  }
 
   // Format date for display
   const formatDate = (date: Date): string => {
@@ -79,8 +132,9 @@ export default function TimelinePage({ params }: TimelinePageProps) {
   }
 
   // Check if a task falls on a specific day
-  const getTasksForDay = (day: Date): typeof tasks => {
-    return projectTasks.filter((task) => {
+  const getTasksForDay = (day: Date): Task[] => {
+    return tasks.filter((task) => {
+      if (!task.dueDate) return false;
       const taskDate = new Date(task.dueDate)
       return (
         taskDate.getDate() === day.getDate() &&
@@ -93,6 +147,29 @@ export default function TimelinePage({ params }: TimelinePageProps) {
   // Get user by ID
   const getUser = (userId: string) => {
     return users.find((user) => user.id === userId)
+  }
+
+  // Handle task click
+  const handleTaskClick = (taskId: string) => {
+    // Update URL with taskId as a query parameter
+    const params = new URLSearchParams(searchParams.toString())
+    params.set("taskId", taskId)
+    router.push(`${window.location.pathname}?${params.toString()}`)
+  }
+
+  // Handle date click
+  const handleDateClick = (date: Date) => {
+    setSelectedDate(date)
+    setIsNewTaskDialogOpen(true)
+  }
+
+  // Handle task created
+  const handleTaskCreated = (newTask: Task) => {
+    // Add the new task to the list
+    setTasks(prevTasks => [...prevTasks, newTask])
+    // Reset selected date and close dialog
+    setSelectedDate(null)
+    setIsNewTaskDialogOpen(false)
   }
 
   return (
@@ -120,10 +197,25 @@ export default function TimelinePage({ params }: TimelinePageProps) {
                 <SelectItem value="day">Day</SelectItem>
               </SelectContent>
             </Select>
-            <Button className="bg-primary-blue hover:bg-primary-blue/90">
-              <Plus className="mr-2 h-4 w-4" />
-              New Task
-            </Button>
+            <NewTaskDialog 
+              projectId={id} 
+              users={users}
+              onTaskCreated={handleTaskCreated}
+              initialDueDate={selectedDate}
+              open={isNewTaskDialogOpen}
+              onOpenChange={setIsNewTaskDialogOpen}
+            >
+              <Button 
+                className="bg-primary-blue hover:bg-primary-blue/90"
+                onClick={() => {
+                  setSelectedDate(null)
+                  setIsNewTaskDialogOpen(true)
+                }}
+              >
+                <Plus className="mr-2 h-4 w-4" />
+                New Task
+              </Button>
+            </NewTaskDialog>
           </div>
         </div>
 
@@ -158,7 +250,8 @@ export default function TimelinePage({ params }: TimelinePageProps) {
                     return (
                       <div
                         key={day.toISOString()}
-                        className={`min-h-[120px] border-b border-r p-1 ${isToday ? "bg-primary-blue/5" : ""}`}
+                        className={`min-h-[120px] border-b border-r p-1 ${isToday ? "bg-primary-blue/5" : ""} cursor-pointer hover:bg-muted/10`}
+                        onClick={() => handleDateClick(day)}
                       >
                         <div className="mb-1 text-right text-sm font-medium">{day.getDate()}</div>
                         <div className="space-y-1">
@@ -167,13 +260,17 @@ export default function TimelinePage({ params }: TimelinePageProps) {
                             return (
                               <div
                                 key={task.id}
-                                className={`rounded p-1 text-xs ${
+                                className={`rounded p-1 text-xs cursor-pointer ${
                                   task.priority === "High"
                                     ? "bg-destructive-red/10"
                                     : task.priority === "Medium"
                                       ? "bg-amber-100"
                                       : "bg-slate-100"
                                 }`}
+                                onClick={(e) => {
+                                  e.stopPropagation() // Prevent date click when clicking task
+                                  handleTaskClick(task.id)
+                                }}
                               >
                                 <div className="flex items-center justify-between">
                                   <span className="font-medium">{task.title}</span>
@@ -218,6 +315,11 @@ export default function TimelinePage({ params }: TimelinePageProps) {
           </CardContent>
         </Card>
       </div>
+
+      {/* Add TaskDetailDrawer */}
+      <TaskDetailDrawer projectId={id} />
+      {/* Add ActivityDetailDrawer */}
+      <ActivityDetailDrawer projectId={id} />
     </>
   )
 }
