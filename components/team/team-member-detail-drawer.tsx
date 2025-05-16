@@ -210,10 +210,7 @@ function TeamMemberDetailContent({ projectId }: TeamMemberDetailDrawerProps) {
         if (!open) handleClose()
       }}
     >
-      <SheetContent
-        side={isMobile ? "bottom" : "right"}
-        className={`p-0 ${isMobile ? "h-[90%] rounded-t-lg" : "w-[600px] max-w-[60%]"}`}
-      >
+      <SheetContent side="right" className="w-full sm:max-w-xl overflow-y-auto">
         {loading ? (
           <div className="flex h-full items-center justify-center">
             <div className="h-8 w-8 animate-spin rounded-full border-2 border-primary-blue border-t-transparent"></div>

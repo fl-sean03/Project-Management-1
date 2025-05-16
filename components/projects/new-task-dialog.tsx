@@ -1,6 +1,6 @@
 "use client"
 
-import { useState } from "react"
+import { useState, useEffect } from "react"
 import { 
   Dialog,
   DialogContent,
@@ -34,25 +34,51 @@ type NewTaskDialogProps = {
   projectId: string;
   users: User[];
   onTaskCreated?: (task: Task) => void;
+  initialDueDate?: Date | null;
+  open?: boolean;
+  onOpenChange?: (open: boolean) => void;
 }
 
-export function NewTaskDialog({ children, projectId, users, onTaskCreated }: NewTaskDialogProps) {
-  const [open, setOpen] = useState(false)
+export function NewTaskDialog({ 
+  children, 
+  projectId, 
+  users, 
+  onTaskCreated, 
+  initialDueDate,
+  open: controlledOpen,
+  onOpenChange
+}: NewTaskDialogProps) {
+  const [uncontrolledOpen, setUncontrolledOpen] = useState(false)
   const [loading, setLoading] = useState(false)
   const [formError, setFormError] = useState<string | null>(null)
-  const [date, setDate] = useState<Date>()
+  const [date, setDate] = useState<Date | undefined>(initialDueDate || undefined)
   
+  // Use controlled or uncontrolled open state
+  const open = controlledOpen ?? uncontrolledOpen
+  const setOpen = onOpenChange ?? setUncontrolledOpen
+
   // Default values for the form
   const [formData, setFormData] = useState({
     title: "",
     description: "",
     priority: "Medium",
     status: "To Do",
-    due_date: "",
+    due_date: initialDueDate ? initialDueDate.toISOString().split('T')[0] : "",
     assignee_id: "unassigned",
     project_id: projectId,
     estimated_hours: 0
   })
+  
+  // Update date when initialDueDate changes
+  useEffect(() => {
+    if (initialDueDate) {
+      setDate(initialDueDate)
+      setFormData(prev => ({
+        ...prev,
+        due_date: initialDueDate.toISOString().split('T')[0]
+      }))
+    }
+  }, [initialDueDate])
   
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
     const { name, value } = e.target

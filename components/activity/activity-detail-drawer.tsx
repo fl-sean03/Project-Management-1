@@ -187,7 +187,7 @@ function ActivityDetailContent({ projectId }: ActivityDetailDrawerProps) {
 
   return (
     <Sheet open={isOpen} onOpenChange={handleClose}>
-      <SheetContent side={isMobile ? "bottom" : "right"} className={isMobile ? "h-[80%]" : ""}>
+      <SheetContent side="right" className="w-full sm:max-w-xl overflow-y-auto">
         <SheetHeader className="pb-4">
           <SheetTitle>Activity Details</SheetTitle>
         </SheetHeader>

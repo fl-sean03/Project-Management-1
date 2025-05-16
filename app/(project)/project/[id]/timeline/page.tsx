@@ -12,6 +12,9 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { ChevronLeft, ChevronRight, Plus } from "lucide-react"
 import { projectService, taskService, userService } from "@/lib/services"
 import { Task, User, Project } from "@/lib/types"
+import { NewTaskDialog } from "@/components/projects/new-task-dialog"
+import { TaskDetailDrawer } from "@/components/tasks/task-detail-drawer"
+import { useRouter, useSearchParams } from "next/navigation"
 
 interface TimelinePageProps {
   params: Promise<{
@@ -21,8 +24,12 @@ interface TimelinePageProps {
 
 export default function TimelinePage({ params }: TimelinePageProps) {
   const { id } = use(params)
+  const router = useRouter()
+  const searchParams = useSearchParams()
   const [timeframe, setTimeframe] = useState("month")
   const [currentDate, setCurrentDate] = useState(new Date())
+  const [selectedDate, setSelectedDate] = useState<Date | null>(null)
+  const [isNewTaskDialogOpen, setIsNewTaskDialogOpen] = useState(false)
   
   const [project, setProject] = useState<Project | null>(null)
   const [tasks, setTasks] = useState<Task[]>([])
@@ -141,6 +148,29 @@ export default function TimelinePage({ params }: TimelinePageProps) {
     return users.find((user) => user.id === userId)
   }
 
+  // Handle task click
+  const handleTaskClick = (taskId: string) => {
+    // Update URL with taskId as a query parameter
+    const params = new URLSearchParams(searchParams.toString())
+    params.set("taskId", taskId)
+    router.push(`${window.location.pathname}?${params.toString()}`)
+  }
+
+  // Handle date click
+  const handleDateClick = (date: Date) => {
+    setSelectedDate(date)
+    setIsNewTaskDialogOpen(true)
+  }
+
+  // Handle task created
+  const handleTaskCreated = (newTask: Task) => {
+    // Add the new task to the list
+    setTasks(prevTasks => [...prevTasks, newTask])
+    // Reset selected date and close dialog
+    setSelectedDate(null)
+    setIsNewTaskDialogOpen(false)
+  }
+
   return (
     <>
       <Header title={`${project.name} - Timeline`} />
@@ -166,10 +196,25 @@ export default function TimelinePage({ params }: TimelinePageProps) {
                 <SelectItem value="day">Day</SelectItem>
               </SelectContent>
             </Select>
-            <Button className="bg-primary-blue hover:bg-primary-blue/90">
-              <Plus className="mr-2 h-4 w-4" />
-              New Task
-            </Button>
+            <NewTaskDialog 
+              projectId={id} 
+              users={users}
+              onTaskCreated={handleTaskCreated}
+              initialDueDate={selectedDate}
+              open={isNewTaskDialogOpen}
+              onOpenChange={setIsNewTaskDialogOpen}
+            >
+              <Button 
+                className="bg-primary-blue hover:bg-primary-blue/90"
+                onClick={() => {
+                  setSelectedDate(null)
+                  setIsNewTaskDialogOpen(true)
+                }}
+              >
+                <Plus className="mr-2 h-4 w-4" />
+                New Task
+              </Button>
+            </NewTaskDialog>
           </div>
         </div>
 
@@ -204,7 +249,8 @@ export default function TimelinePage({ params }: TimelinePageProps) {
                     return (
                       <div
                         key={day.toISOString()}
-                        className={`min-h-[120px] border-b border-r p-1 ${isToday ? "bg-primary-blue/5" : ""}`}
+                        className={`min-h-[120px] border-b border-r p-1 ${isToday ? "bg-primary-blue/5" : ""} cursor-pointer hover:bg-muted/10`}
+                        onClick={() => handleDateClick(day)}
                       >
                         <div className="mb-1 text-right text-sm font-medium">{day.getDate()}</div>
                         <div className="space-y-1">
@@ -213,13 +259,17 @@ export default function TimelinePage({ params }: TimelinePageProps) {
                             return (
                               <div
                                 key={task.id}
-                                className={`rounded p-1 text-xs ${
+                                className={`rounded p-1 text-xs cursor-pointer ${
                                   task.priority === "High"
                                     ? "bg-destructive-red/10"
                                     : task.priority === "Medium"
                                       ? "bg-amber-100"
                                       : "bg-slate-100"
                                 }`}
+                                onClick={(e) => {
+                                  e.stopPropagation() // Prevent date click when clicking task
+                                  handleTaskClick(task.id)
+                                }}
                               >
                                 <div className="flex items-center justify-between">
                                   <span className="font-medium">{task.title}</span>
@@ -264,6 +314,9 @@ export default function TimelinePage({ params }: TimelinePageProps) {
           </CardContent>
         </Card>
       </div>
+
+      {/* Add TaskDetailDrawer */}
+      <TaskDetailDrawer projectId={id} />
     </>
   )
 }
