@@ -96,11 +96,12 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
       const { data, error } = await supabase.auth.signInWithOAuth({
         provider: 'google',
         options: {
-          redirectTo: 'https://zyrapm.com/auth/callback',
+          redirectTo: process.env.NEXT_PUBLIC_SITE_URL + '/auth/callback',
           queryParams: {
             access_type: 'offline',
             prompt: 'consent',
           },
+          skipBrowserRedirect: false,
         },
       });
       
