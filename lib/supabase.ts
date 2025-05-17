@@ -7,7 +7,14 @@ export const createSupabaseClient = () => {
   const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!;
   
   console.log('Creating Supabase client with URL:', supabaseUrl);
-  return createClient(supabaseUrl, supabaseAnonKey);
+  return createClient(supabaseUrl, supabaseAnonKey, {
+    auth: {
+      autoRefreshToken: true,
+      persistSession: true,
+      detectSessionInUrl: true,
+      flowType: 'pkce',
+    },
+  });
 };
 
 // Create a browser client (for use in client components)
@@ -22,6 +29,21 @@ export const createBrowserSupabaseClient = () => {
       autoRefreshToken: true,
       detectSessionInUrl: true,
       persistSession: true,
+      storageKey: 'zyra-auth',
+      storage: {
+        getItem: (key) => {
+          if (typeof window === 'undefined') return null;
+          return window.localStorage.getItem(key);
+        },
+        setItem: (key, value) => {
+          if (typeof window === 'undefined') return;
+          window.localStorage.setItem(key, value);
+        },
+        removeItem: (key) => {
+          if (typeof window === 'undefined') return;
+          window.localStorage.removeItem(key);
+        },
+      },
     },
   });
 }; 
