@@ -20,6 +20,7 @@ import { MoreHorizontal, Pencil, Trash2 } from 'lucide-react';
 import { useCurrentUser } from '@/hooks/use-current-user';
 import { useProjectMember } from '@/hooks/use-project-member';
 import type { Comment } from '@/lib/types';
+import { notificationService } from '@/lib/services/notification-service';
 
 export function TaskComments({ taskId, projectId }: { taskId: string; projectId: string }) {
   const { toast } = useToast();
@@ -70,6 +71,13 @@ export function TaskComments({ taskId, projectId }: { taskId: string; projectId:
     setIsSubmitting(true);
     
     try {
+      console.log("=== Starting comment submission ===");
+      console.log("Comment data:", {
+        content: commentText.trim(),
+        task_id: taskId,
+        project_id: projectId
+      });
+
       const response = await commentService.addComment({
         content: commentText.trim(),
         task_id: taskId,
@@ -82,12 +90,47 @@ export function TaskComments({ taskId, projectId }: { taskId: string; projectId:
       
       // Add new comment to the list
       if (response.data && response.data.length > 0) {
-        setComments(prev => [response.data[0], ...prev]);
+        const newComment = response.data[0];
+        console.log("Comment created successfully:", newComment);
+
+        // Create notification for comment
+        if (currentUser) {
+          console.log("Creating comment notification with data:", {
+            commentId: newComment.id,
+            taskId,
+            projectId,
+            commenterId: currentUser.id,
+            commentContent: newComment.content
+          });
+
+          try {
+            const { error: notificationError } = await notificationService.createCommentNotification(
+              newComment.id,
+              taskId,
+              projectId,
+              currentUser.id,
+              newComment.content
+            );
+
+            if (notificationError) {
+              console.error("Error creating comment notification:", notificationError);
+            } else {
+              console.log("Comment notification created successfully");
+            }
+          } catch (err) {
+            console.error("Exception creating comment notification:", err);
+          }
+        } else {
+          console.error("No current user found for notification");
+        }
+
+        setComments(prev => [newComment, ...prev]);
       }
       
       setCommentText('');
     } catch (err: any) {
-      console.error('Error adding comment:', err);
+      console.error("=== Error in comment submission ===");
+      console.error("Error details:", err);
       toast({
         title: 'Error adding comment',
         description: err?.message || 'There was a problem adding your comment. Please try again.',

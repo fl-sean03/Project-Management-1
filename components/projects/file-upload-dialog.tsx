@@ -21,7 +21,7 @@ import {
   SelectTrigger,
   SelectValue 
 } from "@/components/ui/select"
-import { fileService } from "@/lib/services"
+import { fileService, notificationService } from "@/lib/services"
 import { File as FileRecord } from "@/lib/types"
 import { FileIcon, UploadCloud } from "lucide-react"
 
@@ -195,6 +195,14 @@ export function FileUploadDialog({ children, projectId, onFileUploaded }: FileUp
       if (onFileUploaded && result.file) {
         onFileUploaded(result.file as FileRecord)
       }
+      
+      // Create notification for file upload
+      await notificationService.createFileUploadNotification(
+        result.file.id,
+        result.file.name,
+        projectId,
+        result.file.uploaded_by
+      )
       
     } catch (error: any) {
       console.error("Error uploading file:", error)

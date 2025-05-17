@@ -126,7 +126,7 @@ export async function POST(request: NextRequest) {
     console.log('File uploaded successfully to storage, saving metadata');
 
     // Store file metadata in Supabase
-    const { data: fileData, error: fileError } = await supabase
+    const { data: fileData, error: fileError } = await cookieSupabase
       .from('files')
       .insert({
         id: fileId,

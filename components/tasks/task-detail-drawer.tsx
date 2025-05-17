@@ -113,8 +113,8 @@ function TaskDetailContent({ projectId }: TaskDetailDrawerProps) {
         setTask(taskData);
         
         // Fetch assignee details if available
-        if (taskData.assignee) {
-          const { data: assigneeData, error: assigneeError } = await userService.getUserById(taskData.assignee);
+        if (taskData.assignee_id) {
+          const { data: assigneeData, error: assigneeError } = await userService.getUserById(taskData.assignee_id);
           
           if (!assigneeError && assigneeData) {
             setAssignee(assigneeData);
@@ -124,8 +124,8 @@ function TaskDetailContent({ projectId }: TaskDetailDrawerProps) {
         }
         
         // Fetch project details
-        if (taskData.project) {
-          const { data: projectData, error: projectError } = await projectService.getProjectById(taskData.project);
+        if (taskData.project_id) {
+          const { data: projectData, error: projectError } = await projectService.getProjectById(taskData.project_id);
           
           if (!projectError && projectData) {
             setProject(projectData);
@@ -217,7 +217,7 @@ function TaskDetailContent({ projectId }: TaskDetailDrawerProps) {
             
             <TaskComments 
               taskId={task.id} 
-              projectId={task.project} 
+              projectId={task.project_id} 
             />
           </div>
         ) : null}

@@ -24,7 +24,7 @@ import {
 import { Calendar } from "@/components/ui/calendar"
 import { CalendarIcon } from "lucide-react"
 import { format } from "date-fns"
-import { taskService, projectService, userService } from "@/lib/services"
+import { taskService, projectService, userService, notificationService } from "@/lib/services"
 import { Task, User } from "@/lib/types"
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover"
 import { cn } from "@/lib/utils"
@@ -168,6 +168,8 @@ export function NewTaskDialog({
         assignee_id: formData.assignee_id === "unassigned" ? undefined : formData.assignee_id
       }
       
+      console.log("Task data after processing:", taskToCreate)
+      
       // Create task in Supabase
       const { data, error } = await taskService.createTask(taskToCreate)
       
@@ -180,22 +182,70 @@ export function NewTaskDialog({
       // Log the created task
       console.log("Task created successfully:", data)
       
-      // Close dialog and reset form
-      setOpen(false)
-      setFormData({
-        title: "",
-        description: "",
-        priority: "Medium",
-        status: "To Do",
-        due_date: "",
-        assignee_id: "unassigned",
-        project_id: projectId
-      })
-      setDate(undefined)
-      
-      // Call onTaskCreated callback if provided
-      if (onTaskCreated && data && data.length > 0) {
-        onTaskCreated(data[0] as Task)
+      if (data && data.length > 0) {
+        const newTask = data[0] as Task
+        
+        // Get current user for notification
+        const { data: currentUser, error: userError } = await userService.getCurrentUser()
+        
+        if (userError) {
+          console.error("Error getting current user:", userError)
+        }
+        
+        console.log("Current user for notification:", currentUser)
+        console.log("New task details:", newTask)
+        
+        // If task is assigned, create assignment notification
+        if (newTask.assignee_id && currentUser) {
+          console.log("Creating task assignment notification for:", {
+            taskId: newTask.id,
+            taskTitle: newTask.title,
+            assigneeId: newTask.assignee_id,
+            assignerId: currentUser.id
+          })
+          
+          try {
+            const { error: notificationError } = await notificationService.createTaskAssignmentNotification(
+              newTask.id,
+              newTask.title,
+              newTask.assignee_id,
+              currentUser.id
+            )
+            
+            if (notificationError) {
+              console.error("Error creating task assignment notification:", notificationError)
+            } else {
+              console.log("Task assignment notification created successfully")
+            }
+          } catch (err) {
+            console.error("Exception creating task assignment notification:", err)
+          }
+        } else {
+          console.log("Skipping notification - no assignee or current user:", {
+            hasAssignee: !!newTask.assignee_id,
+            hasCurrentUser: !!currentUser,
+            assigneeId: newTask.assignee_id,
+            currentUserId: currentUser?.id
+          })
+        }
+        
+        // Close dialog and reset form
+        setOpen(false)
+        setFormData({
+          title: "",
+          description: "",
+          priority: "Medium",
+          status: "To Do",
+          due_date: "",
+          assignee_id: "unassigned",
+          project_id: projectId
+        })
+        setDate(undefined)
+        
+        // Call onTaskCreated callback if provided
+        if (onTaskCreated) {
+          onTaskCreated(newTask)
+        }
       }
       
     } catch (error: any) {

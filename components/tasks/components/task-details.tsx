@@ -30,9 +30,9 @@ export function TaskDetails({ task, assignee, onStatusChange }: TaskDetailsProps
   const getInitials = (name: string) => {
     if (!name) return "??"
     return name
-      .split(' ')
+      .split(" ")
       .map(part => part[0])
-      .join('')
+      .join("")
       .toUpperCase()
       .substring(0, 2)
   }
@@ -81,8 +81,9 @@ export function TaskDetails({ task, assignee, onStatusChange }: TaskDetailsProps
     try {
       await taskService.updateTaskStatus(task.id, newStatus)
       onStatusChange()
-    } catch (err: any) {
-      setError(err.message || "Failed to update status")
+    } catch (err) {
+      const errorMessage = err instanceof Error ? err.message : "Failed to update status"
+      setError(errorMessage)
       // Revert to previous status
       setSelectedStatus(task.status)
     } finally {
@@ -103,7 +104,7 @@ export function TaskDetails({ task, assignee, onStatusChange }: TaskDetailsProps
           <div className="flex items-center gap-2">
             <Clock className="h-4 w-4 text-gray-500" />
             <span className="text-sm text-gray-500">Created:</span>
-            <span className="text-sm">{formatDate(task.createdAt)}</span>
+            <span className="text-sm">{formatDate(task.created_at)}</span>
           </div>
           
           <div className="flex items-center gap-2">
@@ -151,39 +152,17 @@ export function TaskDetails({ task, assignee, onStatusChange }: TaskDetailsProps
             </Select>
             
             {isChangingStatus && (
-              <div className="h-4 w-4 animate-spin rounded-full border-2 border-primary-blue border-t-transparent"></div>
+              <div className="h-4 w-4 animate-spin rounded-full border-2 border-primary-blue border-t-transparent" />
             )}
           </div>
           
           <div className="flex items-center gap-2">
             <Tag className="h-4 w-4 text-gray-500" />
             <span className="text-sm text-gray-500">Priority:</span>
-            <Badge className={`${getPriorityColor(task.priority)}`}>
+            <Badge className={getPriorityColor(task.priority)}>
               {task.priority}
             </Badge>
           </div>
-          
-          {task.estimatedHours > 0 && (
-            <div className="flex items-center gap-2">
-              <Clock className="h-4 w-4 text-gray-500" />
-              <span className="text-sm text-gray-500">Estimated:</span>
-              <span className="text-sm">{task.estimatedHours} hours</span>
-            </div>
-          )}
-          
-          {task.tags && task.tags.length > 0 && (
-            <div className="flex flex-wrap items-center gap-2">
-              <Tag className="h-4 w-4 text-gray-500" />
-              <span className="text-sm text-gray-500">Tags:</span>
-              <div className="flex flex-wrap gap-1">
-                {task.tags.map(tag => (
-                  <Badge key={tag} variant="outline" className="text-xs">
-                    {tag}
-                  </Badge>
-                ))}
-              </div>
-            </div>
-          )}
         </div>
       </div>
       

@@ -6,4 +6,5 @@ export * from './user-service';
 export * from './comment-service';
 export * from './file-service';
 export * from './activity-service';
-export * from './email-service'; 
+export * from './email-service';
+export { notificationService } from './notification-service'; 

@@ -25,10 +25,10 @@ export const taskService = {
         dueDate: task.due_date,
         createdAt: task.created_at,
         estimatedHours: task.estimated_hours,
-        project: task.project_id,
-        assignee: task.assignee_id,
+        project_id: task.project_id,
+        assignee_id: task.assignee_id,
         tags: task.tags || [],
-        comments: 0 // This would be replaced with an actual count in a production app
+        comments: 0
       }));
     }
     
@@ -57,10 +57,10 @@ export const taskService = {
         dueDate: response.data.due_date,
         createdAt: response.data.created_at,
         estimatedHours: response.data.estimated_hours,
-        project: response.data.project_id,
-        assignee: response.data.assignee_id,
+        project_id: response.data.project_id,
+        assignee_id: response.data.assignee_id,
         tags: response.data.tags || [],
-        comments: 0 // This would be replaced with an actual count in a production app
+        comments: 0
       };
     }
     
@@ -89,10 +89,10 @@ export const taskService = {
         dueDate: task.due_date,
         createdAt: task.created_at,
         estimatedHours: task.estimated_hours,
-        project: task.project_id,
-        assignee: task.assignee_id,
+        project_id: task.project_id,
+        assignee_id: task.assignee_id,
         tags: task.tags || [],
-        comments: 0 // This would be replaced with an actual count in a production app
+        comments: 0
       }));
     }
     
@@ -158,8 +158,8 @@ export const taskService = {
           dueDate: insertedTask.due_date || '',
           createdAt: insertedTask.created_at,
           estimatedHours: insertedTask.estimated_hours || 0,
-          project: insertedTask.project_id,
-          assignee: insertedTask.assignee_id || '',
+          project_id: insertedTask.project_id,
+          assignee_id: insertedTask.assignee_id || '',
           tags: insertedTask.tags || [],
           comments: 0
         };
@@ -203,8 +203,8 @@ export const taskService = {
           dueDate: updatedTask.due_date || '',
           createdAt: updatedTask.created_at,
           estimatedHours: updatedTask.estimated_hours || 0,
-          project: updatedTask.project_id,
-          assignee: updatedTask.assignee_id || '',
+          project_id: updatedTask.project_id,
+          assignee_id: updatedTask.assignee_id || '',
           tags: updatedTask.tags || [],
           comments: 0
         };
@@ -261,8 +261,8 @@ export const taskService = {
           dueDate: updatedTask.due_date || '',
           createdAt: updatedTask.created_at,
           estimatedHours: updatedTask.estimated_hours || 0,
-          project: updatedTask.project_id,
-          assignee: updatedTask.assignee_id || '',
+          project_id: updatedTask.project_id,
+          assignee_id: updatedTask.assignee_id || '',
           tags: updatedTask.tags || [],
           comments: 0
         };
