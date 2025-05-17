@@ -40,20 +40,19 @@ export type User = {
 };
 
 // Task type definition
-export type Task = {
+export interface Task {
   id: string;
   title: string;
   description: string;
   status: string;
   priority: string;
   dueDate: string;
-  createdAt: string;
-  estimatedHours: number;
-  project: string;
-  assignee: string;
-  tags: string[];
-  comments: number;
-};
+  project_id: string;
+  assignee_id: string | null;
+  created_by: string;
+  created_at: string;
+  updated_at: string;
+}
 
 // Comment type definition
 export type Comment = {
@@ -96,4 +95,21 @@ export type File = {
   project: string;
   description: string;
   url: string;
+};
+
+// Notification type definition
+export type Notification = {
+  id: string;
+  type: 'task_assigned' | 'comment' | 'file_uploaded';
+  content: string;
+  link: string;
+  read: boolean;
+  user_id: string;
+  related_user_id: string | null;
+  created_at: string;
+  related_user?: {
+    id: string;
+    name: string;
+    avatar: string | null;
+  };
 }; 

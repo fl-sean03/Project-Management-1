@@ -22,6 +22,7 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu"
+import { NotificationsDropdown } from "@/components/notifications/notifications-dropdown"
 
 interface HeaderProps {
   title?: string
@@ -105,29 +106,7 @@ export function Header({ title, showLogo = false, projectId, onMemberAdded }: He
           />
         </div>
 
-        <DropdownMenu>
-          <DropdownMenuTrigger asChild>
-            <Button variant="ghost" size="icon" className="relative">
-              <Bell className="h-5 w-5" />
-              {notifications.filter((n) => !n.read).length > 0 && (
-                <span className="absolute right-1 top-1 flex h-2 w-2 rounded-full bg-destructive-red"></span>
-              )}
-              <span className="sr-only">Notifications</span>
-            </Button>
-          </DropdownMenuTrigger>
-          <DropdownMenuContent align="end" className="w-80">
-            <DropdownMenuLabel>Notifications</DropdownMenuLabel>
-            <DropdownMenuSeparator />
-            {notifications.slice(0, 5).map((notification) => (
-              <DropdownMenuItem key={notification.id} className="flex flex-col items-start py-2">
-                <div className="text-sm font-medium">{notification.content}</div>
-                <div className="text-xs text-muted-foreground">{notification.time}</div>
-              </DropdownMenuItem>
-            ))}
-            <DropdownMenuSeparator />
-            <DropdownMenuItem className="justify-center text-sm font-medium">View all notifications</DropdownMenuItem>
-          </DropdownMenuContent>
-        </DropdownMenu>
+        <NotificationsDropdown />
 
         <DropdownMenu>
           <DropdownMenuTrigger asChild>
