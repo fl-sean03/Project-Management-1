@@ -26,6 +26,7 @@ import { projectService, userService, fileService } from "@/lib/services"
 import { Project, User, File as FileType } from "@/lib/types"
 import { FileUploadDialog } from "@/components/projects/file-upload-dialog"
 import { FileDownloadButton } from "@/components/projects/file-download-button"
+import { FilePreviewDialog } from "@/components/projects/file-preview-dialog"
 
 interface ProjectFilesPageProps {
   params: {
@@ -223,30 +224,32 @@ export default function ProjectFilesPage({ params }: ProjectFilesPageProps) {
                 return (
                   <Card key={file.id} className="cursor-pointer hover:shadow-md">
                     <CardContent className="p-4">
-                      <div className="flex flex-col items-center">
-                        <div className="mb-2 flex h-16 w-16 items-center justify-center rounded-md bg-muted">
-                          {getFileIcon(file.type)}
+                      <FilePreviewDialog file={file}>
+                        <div className="flex flex-col items-center">
+                          <div className="mb-2 flex h-16 w-16 items-center justify-center rounded-md bg-muted">
+                            {getFileIcon(file.type)}
+                          </div>
+                          <h4 className="mb-1 text-center text-sm font-medium">{file.name}</h4>
+                          <p className="text-xs text-muted-foreground">{file.size}</p>
+                          <div className="mt-2 flex items-center gap-1">
+                            {uploader && (
+                              <Avatar className="h-5 w-5">
+                                <AvatarImage src={uploader.avatar || "/placeholder.svg"} alt={uploader.name} />
+                                <AvatarFallback className="text-[10px]">
+                                  {uploader.name
+                                    .split(" ")
+                                    .map((n) => n[0])
+                                    .join("")}
+                                </AvatarFallback>
+                              </Avatar>
+                            )}
+                            <span className="text-xs text-muted-foreground">{formatDate(file.uploadedAt)}</span>
+                          </div>
+                          <div className="mt-3 flex w-full justify-center">
+                            <FileDownloadButton file={file} />
+                          </div>
                         </div>
-                        <h4 className="mb-1 text-center text-sm font-medium">{file.name}</h4>
-                        <p className="text-xs text-muted-foreground">{file.size}</p>
-                        <div className="mt-2 flex items-center gap-1">
-                          {uploader && (
-                            <Avatar className="h-5 w-5">
-                              <AvatarImage src={uploader.avatar || "/placeholder.svg"} alt={uploader.name} />
-                              <AvatarFallback className="text-[10px]">
-                                {uploader.name
-                                  .split(" ")
-                                  .map((n) => n[0])
-                                  .join("")}
-                              </AvatarFallback>
-                            </Avatar>
-                          )}
-                          <span className="text-xs text-muted-foreground">{formatDate(file.uploadedAt)}</span>
-                        </div>
-                        <div className="mt-3 flex w-full justify-center">
-                          <FileDownloadButton file={file} />
-                        </div>
-                      </div>
+                      </FilePreviewDialog>
                     </CardContent>
                   </Card>
                 )
@@ -274,10 +277,12 @@ export default function ProjectFilesPage({ params }: ProjectFilesPageProps) {
                         return (
                           <tr key={file.id} className="border-b hover:bg-muted/50">
                             <td className="px-4 py-3">
-                              <div className="flex items-center gap-2">
-                                {getFileIcon(file.type)}
-                                <span className="text-sm font-medium">{file.name}</span>
-                              </div>
+                              <FilePreviewDialog file={file}>
+                                <div className="flex items-center gap-2">
+                                  {getFileIcon(file.type)}
+                                  <span className="text-sm font-medium">{file.name}</span>
+                                </div>
+                              </FilePreviewDialog>
                             </td>
                             <td className="px-4 py-3 text-sm">
                               {file.type.charAt(0).toUpperCase() + file.type.slice(1)}
@@ -310,7 +315,6 @@ export default function ProjectFilesPage({ params }: ProjectFilesPageProps) {
                                     </Button>
                                   </DropdownMenuTrigger>
                                   <DropdownMenuContent align="end">
-                                    <DropdownMenuItem>View Details</DropdownMenuItem>
                                     <DropdownMenuItem>Share</DropdownMenuItem>
                                     <DropdownMenuItem>Rename</DropdownMenuItem>
                                     <DropdownMenuItem className="text-destructive-red">Delete</DropdownMenuItem>
