@@ -12,21 +12,6 @@ export const createSupabaseClient = () => {
       autoRefreshToken: true,
       persistSession: true,
       detectSessionInUrl: true,
-      flowType: 'pkce',
-      storage: {
-        getItem: (key) => {
-          if (typeof window === 'undefined') return null;
-          return window.localStorage.getItem(key);
-        },
-        setItem: (key, value) => {
-          if (typeof window === 'undefined') return;
-          window.localStorage.setItem(key, value);
-        },
-        removeItem: (key) => {
-          if (typeof window === 'undefined') return;
-          window.localStorage.removeItem(key);
-        },
-      },
     },
   });
 };
@@ -39,25 +24,10 @@ export const createBrowserSupabaseClient = () => {
   console.log('Creating browser Supabase client with URL:', supabaseUrl);
   return createBrowserClient(supabaseUrl, supabaseAnonKey, {
     auth: {
-      flowType: 'pkce',
       autoRefreshToken: true,
-      detectSessionInUrl: true,
       persistSession: true,
+      detectSessionInUrl: true,
       storageKey: 'zyra-auth',
-      storage: {
-        getItem: (key) => {
-          if (typeof window === 'undefined') return null;
-          return window.localStorage.getItem(key);
-        },
-        setItem: (key, value) => {
-          if (typeof window === 'undefined') return;
-          window.localStorage.setItem(key, value);
-        },
-        removeItem: (key) => {
-          if (typeof window === 'undefined') return;
-          window.localStorage.removeItem(key);
-        },
-      },
     },
   });
 }; 
