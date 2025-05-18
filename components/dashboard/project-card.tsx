@@ -13,14 +13,14 @@ interface ProjectCardProps {
   name: string
   description: string
   progress: number
-  dueDate: string
+  created_at: string
   team: string[] | null
   status: string
   priority: string
   userRole?: string
 }
 
-export function ProjectCard({ id, name, description, progress, dueDate, team = [], status, priority, userRole }: ProjectCardProps) {
+export function ProjectCard({ id, name, description, progress, created_at, team = [], status, priority, userRole }: ProjectCardProps) {
   const [teamMembers, setTeamMembers] = useState<User[]>([])
   
   useEffect(() => {
@@ -60,16 +60,32 @@ export function ProjectCard({ id, name, description, progress, dueDate, team = [
   const priorityColor = priorityColors[priority as keyof typeof priorityColors] || "bg-slate-100 text-slate-800"
 
   const formatDate = (dateString: string) => {
+    if (!dateString) {
+      console.warn('No date string provided');
+      return 'N/A';
+    }
+
     try {
-      const date = new Date(dateString)
+      // Log the incoming date string for debugging
+      console.log('Raw date string:', dateString);
+      
+      // Handle ISO string format
+      const date = new Date(dateString);
+      
+      // Check if date is valid
+      if (isNaN(date.getTime())) {
+        console.warn('Invalid date:', dateString);
+        return 'N/A';
+      }
+
       return new Intl.DateTimeFormat("en-US", {
         month: "short",
         day: "numeric",
         year: "numeric",
-      }).format(date)
+      }).format(date);
     } catch (e) {
-      console.error("Invalid date:", dateString)
-      return "Invalid date"
+      console.error("Error formatting date:", e);
+      return 'N/A';
     }
   }
 
@@ -98,7 +114,7 @@ export function ProjectCard({ id, name, description, progress, dueDate, team = [
         </div>
         <div className="flex items-center justify-between">
           <div className="text-sm text-muted-foreground">
-            Due: <span className="font-medium">{formatDate(dueDate)}</span>
+            Started: <span className="font-medium">{formatDate(created_at)}</span>
           </div>
           <div className="flex -space-x-2">
             {teamMembers.slice(0, 3).map((user, i) => (

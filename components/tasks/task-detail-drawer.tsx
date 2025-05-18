@@ -7,6 +7,7 @@ import { taskService, userService, projectService } from "@/lib/services"
 import { TaskDetails } from "./components/task-details"
 import { TaskComments } from "./components/task-comments"
 import type { Task, User, Project } from "@/lib/types"
+import { useTaskContext } from "@/contexts/task-context"
 
 interface TaskDetailDrawerProps {
   projectId: string
@@ -14,6 +15,7 @@ interface TaskDetailDrawerProps {
 
 // Inner component that uses search params
 function TaskDetailContent({ projectId }: TaskDetailDrawerProps) {
+  const { updateTaskStatus } = useTaskContext()
   const router = useRouter()
   const pathname = usePathname()
   const searchParams = useSearchParams()
@@ -157,8 +159,15 @@ function TaskDetailContent({ projectId }: TaskDetailDrawerProps) {
   }
   
   // Handle task status change
-  const handleStatusChange = async () => {
-    await fetchTaskData();
+  const handleStatusChange = async (newStatus: string) => {
+    if (!currentTaskId) return;
+    
+    try {
+      await updateTaskStatus(currentTaskId, newStatus)
+      await fetchTaskData()
+    } catch (err) {
+      console.error("Error updating task status:", err)
+    }
   }
   
   // Helper function to fetch task data again

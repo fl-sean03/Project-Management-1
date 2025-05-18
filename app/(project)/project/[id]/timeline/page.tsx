@@ -16,6 +16,8 @@ import { NewTaskDialog } from "@/components/projects/new-task-dialog"
 import { TaskDetailDrawer } from "@/components/tasks/task-detail-drawer"
 import { ActivityDetailDrawer } from "@/components/activity/activity-detail-drawer"
 import { useRouter, useSearchParams } from "next/navigation"
+import { useTaskContext } from "@/contexts/task-context"
+import { Spinner } from "@/components/ui/spinner"
 
 interface TimelinePageProps {
   params: Promise<{
@@ -27,18 +29,18 @@ export default function TimelinePage({ params }: TimelinePageProps) {
   const { id } = use(params)
   const router = useRouter()
   const searchParams = useSearchParams()
+  const { tasks, setTasks, updateTaskStatus } = useTaskContext()
   const [timeframe, setTimeframe] = useState("month")
   const [currentDate, setCurrentDate] = useState(new Date())
   const [selectedDate, setSelectedDate] = useState<Date | null>(null)
   const [isNewTaskDialogOpen, setIsNewTaskDialogOpen] = useState(false)
   
   const [project, setProject] = useState<Project | null>(null)
-  const [tasks, setTasks] = useState<Task[]>([])
   const [users, setUsers] = useState<User[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
 
-  // Fetch project, tasks, and users data
+  // Fetch project and users data
   useEffect(() => {
     const fetchData = async () => {
       setLoading(true)
@@ -75,11 +77,15 @@ export default function TimelinePage({ params }: TimelinePageProps) {
     }
     
     fetchData()
-  }, [id])
+  }, [id, setTasks])
 
   // If loading or error, show appropriate UI
   if (loading) {
-    return <div className="p-4">Loading timeline data...</div>
+    return (
+      <div className="flex h-[calc(100vh-4rem)] items-center justify-center">
+        <Spinner size="lg" className="text-primary-blue" />
+      </div>
+    )
   }
   
   if (error || !project) {
@@ -199,7 +205,6 @@ export default function TimelinePage({ params }: TimelinePageProps) {
             </Select>
             <NewTaskDialog 
               projectId={id} 
-              users={users}
               onTaskCreated={handleTaskCreated}
               initialDueDate={selectedDate}
               open={isNewTaskDialogOpen}
@@ -256,7 +261,7 @@ export default function TimelinePage({ params }: TimelinePageProps) {
                         <div className="mb-1 text-right text-sm font-medium">{day.getDate()}</div>
                         <div className="space-y-1">
                           {dayTasks.map((task) => {
-                            const assignee = getUser(task.assignee)
+                            const assignee = task.assignee_id ? getUser(task.assignee_id) : null
                             return (
                               <div
                                 key={task.id}

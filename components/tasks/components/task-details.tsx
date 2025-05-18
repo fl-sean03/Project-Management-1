@@ -19,7 +19,7 @@ import type { Task, User } from "@/lib/types"
 interface TaskDetailsProps {
   task: Task
   assignee: User | null
-  onStatusChange: () => void
+  onStatusChange: (newStatus: string) => Promise<void>
 }
 
 export function TaskDetails({ task, assignee, onStatusChange }: TaskDetailsProps) {
@@ -79,8 +79,7 @@ export function TaskDetails({ task, assignee, onStatusChange }: TaskDetailsProps
     setError(null)
     
     try {
-      await taskService.updateTaskStatus(task.id, newStatus)
-      onStatusChange()
+      await onStatusChange(newStatus)
     } catch (err) {
       const errorMessage = err instanceof Error ? err.message : "Failed to update status"
       setError(errorMessage)

@@ -13,9 +13,10 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { projectService, userService, activityService } from "@/lib/services"
 import { Project, User, Activity } from "@/lib/types"
 import { TeamInviteDialog } from "@/components/projects/team-invite-dialog"
-import { TeamMemberDetailDrawer } from "@/components/team/team-member-detail-drawer"
+
 import { useToast } from "@/components/ui/use-toast"
 import { useAuth } from "@/hooks/auth"
+import { Spinner } from "@/components/ui/spinner"
 
 interface TeamPageProps {
   params: Promise<{
@@ -219,12 +220,9 @@ export default function TeamPage({ params }: TeamPageProps) {
 
   if (loading) {
     return (
-      <>
-        <Header title="Loading Team..." />
-        <div className="p-4 lg:p-6 flex items-center justify-center h-64">
-          <p>Loading team data...</p>
-        </div>
-      </>
+      <div className="flex h-[calc(100vh-4rem)] items-center justify-center">
+        <Spinner size="lg" className="text-primary-blue" />
+      </div>
     )
   }
   
@@ -416,8 +414,7 @@ export default function TeamPage({ params }: TeamPageProps) {
         </Tabs>
       </div>
       
-      {/* Add the TeamMemberDetailDrawer with current project ID */}
-      <TeamMemberDetailDrawer projectId={id} />
+      
     </>
   )
 }

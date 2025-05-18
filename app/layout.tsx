@@ -5,6 +5,7 @@ import { ThemeProvider } from "@/components/theme-provider"
 import { AuthProvider } from "@/hooks/auth"
 import { Toaster } from "@/components/ui/toaster"
 import { GlobalDrawers } from "@/components/global-drawers"
+import { TaskProvider } from "@/contexts/task-context"
 
 const inter = Inter({
   subsets: ["latin"],
@@ -36,13 +37,15 @@ export default function RootLayout({
   return (
     <html lang="en" suppressHydrationWarning>
       <body className={`${inter.variable} ${spaceGrotesk.variable} ${jetbrainsMono.variable} font-sans`}>
-        <ThemeProvider attribute="class" defaultTheme="light" enableSystem disableTransitionOnChange>
-          <AuthProvider>
-            {children}
-            <GlobalDrawers />
-            <Toaster />
-          </AuthProvider>
-        </ThemeProvider>
+        <TaskProvider>
+          <ThemeProvider attribute="class" defaultTheme="light" enableSystem disableTransitionOnChange>
+            <AuthProvider>
+              {children}
+              <GlobalDrawers />
+              <Toaster />
+            </AuthProvider>
+          </ThemeProvider>
+        </TaskProvider>
       </body>
     </html>
   )

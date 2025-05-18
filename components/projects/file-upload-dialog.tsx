@@ -86,6 +86,7 @@ export function FileUploadDialog({ children, projectId, onFileUploaded }: FileUp
   const [formError, setFormError] = useState<string | null>(null)
   const [fileSelected, setFileSelected] = useState<FileSelectionState | null>(null)
   const [uploadProgress, setUploadProgress] = useState(0)
+  const [isDragging, setIsDragging] = useState(false)
   const fileInputRef = useRef<HTMLInputElement>(null)
   
   const [formData, setFormData] = useState({
@@ -93,6 +94,43 @@ export function FileUploadDialog({ children, projectId, onFileUploaded }: FileUp
     is_public: true,
   })
   
+  const handleDragEnter = (e: React.DragEvent) => {
+    e.preventDefault()
+    e.stopPropagation()
+    setIsDragging(true)
+  }
+
+  const handleDragLeave = (e: React.DragEvent) => {
+    e.preventDefault()
+    e.stopPropagation()
+    setIsDragging(false)
+  }
+
+  const handleDragOver = (e: React.DragEvent) => {
+    e.preventDefault()
+    e.stopPropagation()
+  }
+
+  const handleDrop = (e: React.DragEvent) => {
+    e.preventDefault()
+    e.stopPropagation()
+    setIsDragging(false)
+
+    const files = e.dataTransfer.files
+    if (!files || files.length === 0) return
+
+    const file = files[0]
+    const { extension, mimeType } = getFileInfo(file.name)
+    
+    setFileSelected({
+      name: file.name,
+      size: formatFileSize(file.size),
+      type: extension,
+      rawFile: file,
+      content_type: mimeType
+    })
+  }
+
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const files = e.target.files
     if (!files || files.length === 0) {
@@ -243,13 +281,21 @@ export function FileUploadDialog({ children, projectId, onFileUploaded }: FileUp
           </DialogHeader>
           <div className="grid gap-4 py-4">
             <div 
-              className={`flex flex-col items-center justify-center rounded-lg border-2 border-dashed p-6 ${
-                fileSelected ? 'border-primary-blue bg-primary-blue/5' : 'border-gray-300'
+              className={`flex flex-col items-center justify-center rounded-lg border-2 border-dashed p-6 transition-colors ${
+                isDragging 
+                  ? 'border-primary-blue bg-primary-blue/10' 
+                  : fileSelected 
+                    ? 'border-primary-blue bg-primary-blue/5' 
+                    : 'border-gray-300 hover:border-primary-blue/50'
               }`}
+              onDragEnter={handleDragEnter}
+              onDragLeave={handleDragLeave}
+              onDragOver={handleDragOver}
+              onDrop={handleDrop}
             >
               {!fileSelected ? (
                 <>
-                  <UploadCloud className="mb-2 h-10 w-10 text-gray-400" />
+                  <UploadCloud className={`mb-2 h-10 w-10 ${isDragging ? 'text-primary-blue' : 'text-gray-400'}`} />
                   <p className="mb-1 text-sm font-medium">Drag and drop or click to upload</p>
                   <p className="text-xs text-muted-foreground">Supports files up to 100MB</p>
                 </>

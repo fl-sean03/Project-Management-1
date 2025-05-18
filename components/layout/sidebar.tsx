@@ -96,7 +96,7 @@ export function Sidebar({ className, projectId }: SidebarProps) {
   return (
     <div
       className={cn(
-        "flex h-screen flex-col border-r bg-white transition-all duration-300",
+        "flex h-screen flex-col border-r bg-white transition-all duration-300 relative",
         collapsed ? "w-16" : "w-64",
         className,
       )}
@@ -109,7 +109,15 @@ export function Sidebar({ className, projectId }: SidebarProps) {
             <Logo withText />
           )}
         </div>
-        <Button variant="ghost" size="icon" onClick={() => setCollapsed(!collapsed)} className="h-8 w-8">
+        <Button 
+          variant="ghost" 
+          size="icon" 
+          onClick={() => setCollapsed(!collapsed)} 
+          className={cn(
+            "h-8 w-8 z-10",
+            collapsed && "absolute -right-2 z-30 top-2 bg-purple-600 text-white hover:bg-purple-500"
+          )}
+        >
           {collapsed ? <ChevronRight size={16} /> : <ChevronLeft size={16} />}
         </Button>
       </div>

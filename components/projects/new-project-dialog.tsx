@@ -21,13 +21,8 @@ import {
   SelectTrigger,
   SelectValue 
 } from "@/components/ui/select"
-import { Calendar } from "@/components/ui/calendar"
-import { CalendarIcon } from "lucide-react"
-import { format } from "date-fns"
 import { projectService } from "@/lib/services"
 import { Project } from "@/lib/types"
-import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover"
-import { cn } from "@/lib/utils"
 import { PostgrestError } from '@supabase/supabase-js'
 
 type NewProjectDialogProps = {
@@ -39,14 +34,12 @@ export function NewProjectDialog({ children, onProjectCreated }: NewProjectDialo
   const [open, setOpen] = useState(false)
   const [loading, setLoading] = useState(false)
   const [formError, setFormError] = useState<string | null>(null)
-  const [date, setDate] = useState<Date>()
   
   const [formData, setFormData] = useState({
     name: "",
     description: "",
     priority: "Medium",
     status: "Not Started",
-    due_date: "",
     category: "General"
   })
   
@@ -63,24 +56,6 @@ export function NewProjectDialog({ children, onProjectCreated }: NewProjectDialo
       ...prev,
       [name]: value
     }))
-  }
-  
-  const handleDateChange = (newDate: Date | undefined) => {
-    setDate(newDate)
-    if (newDate) {
-      // Format date as YYYY-MM-DD for PostgreSQL
-      const formattedDate = newDate.toISOString().split('T')[0];
-      setFormData(prev => ({
-        ...prev,
-        due_date: formattedDate
-      }))
-    } else {
-      // Clear the date if no date is selected
-      setFormData(prev => ({
-        ...prev,
-        due_date: ""
-      }))
-    }
   }
   
   const handleSubmit = async (e: React.FormEvent) => {
@@ -150,10 +125,8 @@ export function NewProjectDialog({ children, onProjectCreated }: NewProjectDialo
         description: "",
         priority: "Medium",
         status: "Not Started",
-        due_date: "",
         category: "General"
       });
-      setDate(undefined);
       
       // Call onProjectCreated callback if provided
       if (onProjectCreated && data) {
@@ -175,7 +148,7 @@ export function NewProjectDialog({ children, onProjectCreated }: NewProjectDialo
           progress: projectData.progress || 0,
           priority: projectData.priority || 'Medium',
           status: projectData.status || 'Not Started',
-          due_date: projectData.due_date || '',
+          due_date: '',
           created_at: projectData.created_at || new Date().toISOString(),
           category: projectData.category || 'General',
           tasks: 0,
@@ -209,10 +182,8 @@ export function NewProjectDialog({ children, onProjectCreated }: NewProjectDialo
           description: "",
           priority: "Medium",
           status: "Not Started",
-          due_date: "",
           category: "General"
         });
-        setDate(undefined);
         setFormError(null);
       }
       setOpen(newOpen);
@@ -284,31 +255,6 @@ export function NewProjectDialog({ children, onProjectCreated }: NewProjectDialo
                   </SelectContent>
                 </Select>
               </div>
-            </div>
-            <div className="grid items-center gap-2">
-              <Label htmlFor="due_date">Due Date</Label>
-              <Popover>
-                <PopoverTrigger asChild>
-                  <Button
-                    variant="outline"
-                    className={cn(
-                      "justify-start text-left font-normal",
-                      !date && "text-muted-foreground"
-                    )}
-                  >
-                    <CalendarIcon className="mr-2 h-4 w-4" />
-                    {date ? format(date, "PPP") : "Select date"}
-                  </Button>
-                </PopoverTrigger>
-                <PopoverContent className="w-auto p-0">
-                  <Calendar
-                    mode="single"
-                    selected={date}
-                    onSelect={handleDateChange}
-                    initialFocus
-                  />
-                </PopoverContent>
-              </Popover>
             </div>
             <div className="grid items-center gap-2">
               <Label htmlFor="category">Category</Label>
