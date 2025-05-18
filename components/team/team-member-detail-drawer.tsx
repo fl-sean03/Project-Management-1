@@ -163,7 +163,7 @@ function TeamMemberDetailContent({ projectId }: TeamMemberDetailDrawerProps) {
 
   // Filter tasks for the user based on projectId if provided
   const filteredTasks = projectId 
-    ? userTasks.filter(task => task.project === projectId)
+    ? userTasks.filter(task => task.project_id === projectId)
     : userTasks
 
   // Get user's activities

@@ -13,6 +13,7 @@ const nextConfig = {
       'githubusercontent.com',
       'github.com',
       'images.unsplash.com',
+      'proj-bucket-1.nyc3.digitaloceanspaces.com',
     ],
   },
   env: {

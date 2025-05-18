@@ -16,6 +16,8 @@ import { Task, User, Project } from "@/lib/types"
 import { NewTaskDialog } from "@/components/projects/new-task-dialog"
 import { TaskDetailDrawer } from "@/components/tasks/task-detail-drawer"
 import { TeamMemberDetailDrawer } from "@/components/team/team-member-detail-drawer"
+import { useTaskContext } from "@/contexts/task-context"
+import { Spinner } from "@/components/ui/spinner"
 
 interface ProjectTasksPageProps {
   params: {
@@ -33,15 +35,13 @@ const taskStatuses = [
 
 // Inner component that uses search params
 function ProjectTasksContent({ params }: ProjectTasksPageProps) {
-  // Use the useParams hook to get the route params
   const routeParams = useParams<{ id: string }>()
-  // Access the id from routeParams
   const id = routeParams.id
   const router = useRouter()
   const searchParams = useSearchParams()
+  const { tasks, setTasks, updateTaskStatus } = useTaskContext()
 
   const [project, setProject] = useState<Project | null>(null)
-  const [tasks, setTasks] = useState<Task[]>([])
   const [projectMembers, setProjectMembers] = useState<User[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
@@ -100,11 +100,15 @@ function ProjectTasksContent({ params }: ProjectTasksPageProps) {
     }
     
     fetchData()
-  }, [id])
+  }, [id, setTasks])
 
   // If loading or error, show appropriate UI
   if (loading) {
-    return <div className="p-4">Loading project data...</div>
+    return (
+      <div className="flex h-[calc(100vh-4rem)] items-center justify-center">
+        <Spinner size="lg" className="text-primary-blue" />
+      </div>
+    )
   }
   
   if (error || !project) {
@@ -118,7 +122,7 @@ function ProjectTasksContent({ params }: ProjectTasksPageProps) {
       task.description.toLowerCase().includes(searchQuery.toLowerCase())
 
     const matchesStatus = statusFilter === "all" || task.status === statusFilter
-    const matchesAssignee = assigneeFilter === "all" || task.assignee === assigneeFilter
+    const matchesAssignee = assigneeFilter === "all" || task.assignee_id === assigneeFilter
 
     return matchesSearch && matchesStatus && matchesAssignee
   })
@@ -168,26 +172,7 @@ function ProjectTasksContent({ params }: ProjectTasksPageProps) {
 
   // Handle task status update
   const handleTaskStatusUpdate = async (taskId: string, newStatus: string) => {
-    try {
-      const { data, error } = await taskService.updateTaskStatus(taskId, newStatus)
-      
-      if (error) {
-        console.error("Error updating task status:", error)
-        return
-      }
-      
-      if (data && data.length > 0) {
-        // Update the task in the state
-        setTasks(prevTasks => 
-          prevTasks.map(task => 
-            task.id === taskId ? { ...task, status: newStatus } : task
-          )
-        )
-        console.log(`Task ${taskId} status updated to ${newStatus}`)
-      }
-    } catch (err) {
-      console.error("Error updating task status:", err)
-    }
+    await updateTaskStatus(taskId, newStatus)
   }
 
   return (
@@ -274,7 +259,7 @@ function ProjectTasksContent({ params }: ProjectTasksPageProps) {
                 </div>
                 <div className="space-y-3">
                   {tasksByStatus[status.name]?.map((task) => {
-                    const assignee = getUser(task.assignee)
+                    const assignee = task.assignee_id ? getUser(task.assignee_id) : null
 
                     return (
                       <Card key={task.id} className="hover:shadow-md">
@@ -344,7 +329,7 @@ function ProjectTasksContent({ params }: ProjectTasksPageProps) {
               <div className="space-y-4">
                 {filteredTasks.length > 0 ? (
                   filteredTasks.map((task) => {
-                    const assignee = getUser(task.assignee)
+                    const assignee = task.assignee_id ? getUser(task.assignee_id) : null
 
                     return (
                       <div

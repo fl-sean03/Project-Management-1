@@ -42,6 +42,7 @@ import {
   AlertDialogTrigger,
 } from "@/components/ui/alert-dialog";
 import Link from 'next/link';
+import { ProfilePhotoUploadDialog } from "@/components/profile/profile-photo-upload-dialog";
 
 interface ProfilePageProps {
   params: {
@@ -331,16 +332,13 @@ export default function ProfilePage({ params }: ProfilePageProps) {
                         }
                       </AvatarFallback>
                     </Avatar>
-                    <div className="space-y-2">
-                      <Label htmlFor="avatar">Avatar URL</Label>
-                      <Input 
-                        id="avatar" 
-                        name="avatar" 
-                        value={formData.avatar || ''} 
-                        onChange={handleInputChange}
-                        placeholder="URL to your profile image"
-                      />
-                    </div>
+                    <ProfilePhotoUploadDialog
+                      userId={id}
+                      onUploaded={(url) => {
+                        setFormData(prev => ({ ...prev, avatar: url }));
+                        setUser(prev => prev ? { ...prev, avatar: url } : null);
+                      }}
+                    />
                   </div>
                 ) : (
                   <Avatar className="h-32 w-32">

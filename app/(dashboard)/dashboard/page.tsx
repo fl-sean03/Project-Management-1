@@ -108,7 +108,7 @@ export default async function DashboardPage() {
                     name={project.name}
                     description={project.description}
                     progress={project.progress}
-                    dueDate={project.due_date}
+                    created_at={project.created_at}
                     team={project.team}
                     status={project.status}
                     priority={project.priority}

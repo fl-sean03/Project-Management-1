@@ -27,6 +27,7 @@ import { Project, User, File as FileType } from "@/lib/types"
 import { FileUploadDialog } from "@/components/projects/file-upload-dialog"
 import { FileDownloadButton } from "@/components/projects/file-download-button"
 import { FilePreviewDialog } from "@/components/projects/file-preview-dialog"
+import { Spinner } from "@/components/ui/spinner"
 
 interface ProjectFilesPageProps {
   params: {
@@ -96,7 +97,11 @@ export default function ProjectFilesPage({ params }: ProjectFilesPageProps) {
 
   // If loading or error, show appropriate UI
   if (loading) {
-    return <div className="p-4">Loading files data...</div>
+    return (
+      <div className="flex h-[calc(100vh-4rem)] items-center justify-center">
+        <Spinner size="lg" className="text-primary-blue" />
+      </div>
+    )
   }
   
   if (error || !project) {

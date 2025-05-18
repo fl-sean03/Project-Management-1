@@ -27,6 +27,7 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog"
+import { Spinner } from "@/components/ui/spinner"
 
 interface SettingsPageProps {
   params: Promise<{
@@ -95,7 +96,9 @@ export default function SettingsPage({ params }: SettingsPageProps) {
 
   // If loading or error, show appropriate UI
   if (loading) {
-    return <div className="p-4">Loading project settings...</div>
+    return <div className="flex h-[calc(100vh-4rem)] items-center justify-center">
+    <Spinner size="lg" className="text-primary-blue" />
+  </div>
   }
   
   if (error || !project) {
