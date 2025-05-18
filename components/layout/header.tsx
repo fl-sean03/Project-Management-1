@@ -23,6 +23,7 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu"
 import { NotificationsDropdown } from "@/components/notifications/notifications-dropdown"
+import { getSupabaseClient } from "@/lib/services/supabase-client"
 
 interface HeaderProps {
   title?: string
@@ -33,12 +34,32 @@ interface HeaderProps {
 
 export function Header({ title, showLogo = false, projectId, onMemberAdded }: HeaderProps) {
   const [searchQuery, setSearchQuery] = useState("")
+  const [userAvatar, setUserAvatar] = useState<string | null>(null)
   const router = useRouter()
   const pathname = usePathname()
   const { signOut, user } = useAuth()
 
   const isProjectPage = pathname.includes("/project/")
   const currentProjectId = isProjectPage ? pathname.split("/")[2] : projectId
+
+  useEffect(() => {
+    const fetchUserAvatar = async () => {
+      if (!user?.id) return;
+      
+      const supabase = getSupabaseClient();
+      const { data, error } = await supabase
+        .from('users')
+        .select('avatar')
+        .eq('id', user.id)
+        .single();
+
+      if (!error && data?.avatar) {
+        setUserAvatar(data.avatar);
+      }
+    };
+
+    fetchUserAvatar();
+  }, [user?.id]);
 
   const handleBackToProjects = () => {
     router.push("/projects")
@@ -112,7 +133,7 @@ export function Header({ title, showLogo = false, projectId, onMemberAdded }: He
           <DropdownMenuTrigger asChild>
             <Button variant="ghost" size="icon" className="relative h-8 w-8 rounded-full">
               <Avatar className="h-8 w-8">
-                <AvatarImage src={(user?.user_metadata?.avatar || currentUser.avatar || "/placeholder.svg")} alt={user?.user_metadata?.name || currentUser.name} />
+                <AvatarImage src={userAvatar || "/placeholder.svg"} alt={user?.user_metadata?.name || currentUser.name} />
                 <AvatarFallback>
                   {(user?.user_metadata?.name || currentUser.name)
                     .split(" ")
