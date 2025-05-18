@@ -5,6 +5,8 @@ import { Button } from "@/components/ui/button"
 import { Download } from "lucide-react"
 import { getSignedFileUrl } from "@/lib/spaces"
 import { File } from "@/lib/types"
+import { useSupabase } from "@/hooks/use-supabase"
+import { Spinner } from "@/components/ui/spinner"
 
 // Extend the File type to include properties from the database
 interface FileWithStorage extends File {
@@ -22,28 +24,50 @@ type FileDownloadButtonProps = {
 
 export function FileDownloadButton({ file, variant = "ghost", size = "icon", className }: FileDownloadButtonProps) {
   const [loading, setLoading] = useState(false)
+  const { supabase } = useSupabase()
   
   const handleDownload = async () => {
+    if (!supabase) {
+      console.error('Supabase client not initialized');
+      return;
+    }
+
     try {
       setLoading(true)
       
-      // If the file is public, we can download it directly
-      if (file.url) {
-        // For public files, use the direct URL
-        window.open(file.url, '_blank')
-        return
+      // Get the current session
+      const { data: { session }, error: sessionError } = await supabase.auth.getSession();
+      
+      if (sessionError || !session) {
+        throw new Error('Not authenticated');
       }
       
-      // For private files, we need to get a signed URL
-      const response = await fetch(`/api/files/download?key=${encodeURIComponent(file.space_key)}`)
-      const data = await response.json()
+      // Always use our backend API to handle the download
+      const response = await fetch(`/api/files/${file.id}/download`, {
+        headers: {
+          'Authorization': `Bearer ${session.access_token}`
+        }
+      });
       
-      if (!response.ok || !data.success || !data.url) {
-        throw new Error('Failed to get download URL')
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.error || 'Failed to download file');
       }
       
-      // Open the file in a new tab or download it
-      window.open(data.url, '_blank')
+      // Get the blob from the response
+      const blob = await response.blob();
+      
+      // Create a blob URL and trigger download
+      const blobUrl = window.URL.createObjectURL(blob);
+      const link = document.createElement('a');
+      link.href = blobUrl;
+      link.download = file.name;
+      document.body.appendChild(link);
+      link.click();
+      
+      // Clean up
+      document.body.removeChild(link);
+      window.URL.revokeObjectURL(blobUrl);
       
     } catch (error) {
       console.error('Error downloading file:', error)
@@ -61,7 +85,11 @@ export function FileDownloadButton({ file, variant = "ghost", size = "icon", cla
       onClick={handleDownload}
       disabled={loading}
     >
-      <Download className="h-4 w-4" />
+      {loading ? (
+        <Spinner className="h-4 w-4" />
+      ) : (
+        <Download className="h-4 w-4" />
+      )}
     </Button>
   )
 } 
